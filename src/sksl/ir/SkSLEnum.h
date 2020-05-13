@@ -8,11 +8,17 @@
 #ifndef SKSL_ENUM
 #define SKSL_ENUM
 
-#include "SkSLProgramElement.h"
+#include "src/sksl/ir/SkSLExpression.h"
+#include "src/sksl/ir/SkSLProgramElement.h"
+#include "src/sksl/ir/SkSLSymbolTable.h"
+#include "src/sksl/ir/SkSLVariable.h"
 
 #include <algorithm>
+#include <vector>
 
 namespace SkSL {
+
+struct Symbol;
 
 struct Enum : public ProgramElement {
     Enum(int offset, StringFragment typeName, std::shared_ptr<SymbolTable> symbols)
@@ -24,7 +30,7 @@ struct Enum : public ProgramElement {
         return std::unique_ptr<ProgramElement>(new Enum(fOffset, fTypeName, fSymbols));
     }
 
-    String description() const override {
+    String code() const {
         String result = "enum class " + fTypeName + " {\n";
         String separator;
         std::vector<const Symbol*> sortedSymbols;
@@ -34,12 +40,18 @@ struct Enum : public ProgramElement {
         std::sort(sortedSymbols.begin(), sortedSymbols.end(),
                   [](const Symbol* a, const Symbol* b) { return a->fName < b->fName; });
         for (const auto& s : sortedSymbols) {
+            const Expression& initialValue = *((Variable*) s)->fInitialValue;
+            SkASSERT(initialValue.fKind == Expression::kIntLiteral_Kind);
             result += separator + "    " + s->fName + " = " +
-                      ((Variable*) s)->fInitialValue->description();
+                      to_string(((IntLiteral&) initialValue).fValue);
             separator = ",\n";
         }
         result += "\n};";
         return result;
+    }
+
+    String description() const override {
+        return this->code();
     }
 
     bool fBuiltin = false;

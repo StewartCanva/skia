@@ -1,7 +1,9 @@
 // Adds compile-time JS functions to augment the CanvasKit interface.
 // Specifically, anything that should only be on the Skottie builds of canvaskit.
 
-
+// assets is a dictionary of named blobs: { key: ArrayBuffer, ... }
+// The keys should be well-behaved strings - they're turned into null-terminated
+// strings for the native side.
 CanvasKit.MakeManagedAnimation = function(json, assets) {
   if (!CanvasKit._MakeManagedAnimation) {
     throw 'Not compiled with MakeManagedAnimation';
@@ -43,11 +45,23 @@ CanvasKit.MakeManagedAnimation = function(json, assets) {
   var anim = CanvasKit._MakeManagedAnimation(json, assetKeys.length, namesPtr,
                                              assetsPtr, assetSizesPtr);
 
-  // We leave the asset data arrays and string data live and assume
-  // it is now owned by the C++ code
+  // The C++ code has made copies of the asset and string data, so free our copies.
   CanvasKit._free(namesPtr);
   CanvasKit._free(assetsPtr);
   CanvasKit._free(assetSizesPtr);
 
   return anim;
 };
+
+(function(CanvasKit){
+  CanvasKit._extraInitializations = CanvasKit._extraInitializations || [];
+  CanvasKit._extraInitializations.push(function() {
+
+  CanvasKit.ManagedAnimation.prototype.setColor = function(key, color) {
+    var cPtr = copy1dArray(color, CanvasKit.HEAPF32);
+    this._setColor(key, cPtr);
+    CanvasKit._free(cPtr);
+  }
+
+});
+}(Module)); // When this file is loaded in, the high level object is "Module";

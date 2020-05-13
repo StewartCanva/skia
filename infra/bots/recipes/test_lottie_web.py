@@ -24,7 +24,7 @@ LOTTIECAP_SCRIPT = '/SRC/skia/infra/lottiecap/docker/lottiecap_gold.sh'
 
 def RunSteps(api):
   api.vars.setup()
-  checkout_root = api.checkout.default_checkout_root
+  checkout_root = api.path['start_dir']
   out_dir = api.vars.swarming_out_dir
   lottie_files_src = api.vars.slave_dir.join('lottie-samples')
   lottie_files_dir = '/tmp/lottie_files'
@@ -32,8 +32,6 @@ def RunSteps(api):
   # to make finding the lottie.min.js easier to reference from inside
   # the docker image.
   lottie_build = checkout_root.join('lottie', 'build', 'player')
-
-  api.checkout.bot_update(checkout_root=checkout_root)
 
   # Make sure this exists, otherwise Docker will make it with root permissions.
   api.file.ensure_directory('mkdirs out_dir', out_dir, mode=0777)
@@ -105,8 +103,8 @@ os.chmod(out_dir, 0o777)
 
 def GenTests(api):
   yield (
-      api.test('Test-Debian9-none-GCE-CPU-AVX2-x86_64-Debug-All-LottieWeb') +
-      api.properties(buildername=('Test-Debian9-none-GCE-CPU-AVX2'
+      api.test('Test-Debian10-none-GCE-CPU-AVX2-x86_64-Debug-All-LottieWeb') +
+      api.properties(buildername=('Test-Debian10-none-GCE-CPU-AVX2'
                                   '-x86_64-Debug-All-LottieWeb'),
                      repository='https://skia.googlesource.com/skia.git',
                      revision='abc123',
@@ -116,7 +114,7 @@ def GenTests(api):
 
   yield (
       api.test('lottie_web_trybot') +
-      api.properties(buildername=('Test-Debian9-none-GCE-CPU-AVX2'
+      api.properties(buildername=('Test-Debian10-none-GCE-CPU-AVX2'
                                   '-x86_64-Debug-All-LottieWeb'),
                      repository='https://skia.googlesource.com/skia.git',
                      revision='abc123',

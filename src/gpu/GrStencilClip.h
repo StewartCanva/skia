@@ -8,8 +8,8 @@
 #ifndef GrStencilClip_DEFINED
 #define GrStencilClip_DEFINED
 
-#include "GrAppliedClip.h"
-#include "GrFixedClip.h"
+#include "src/gpu/GrAppliedClip.h"
+#include "src/gpu/GrFixedClip.h"
 
 /**
  * Implements GrHardClip with the currently-existing stencil buffer contents and GrFixedClip.
@@ -26,7 +26,7 @@ public:
     const GrFixedClip& fixedClip() const { return fFixedClip; }
     GrFixedClip& fixedClip() { return fFixedClip; }
 
-    bool stencilStackID() const { return fStencilStackID; }
+    uint32_t stencilStackID() const { return fStencilStackID; }
     bool hasStencilClip() const { return SK_InvalidGenID != fStencilStackID; }
     void setStencilClip(uint32_t stencilStackID) { fStencilStackID = stencilStackID; }
 

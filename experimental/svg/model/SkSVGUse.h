@@ -8,12 +8,12 @@
 #ifndef SkSVGUse_DEFINED
 #define SkSVGUse_DEFINED
 
-#include "SkSVGTransformableNode.h"
-#include "SkSVGTypes.h"
+#include "experimental/svg/model/SkSVGTransformableNode.h"
+#include "experimental/svg/model/SkSVGTypes.h"
 
 /**
  * Implements support for <use> (reference) elements.
- * (https://www.w3.org/TR/SVG/struct.html#UseElement)
+ * (https://www.w3.org/TR/SVG11/struct.html#UseElement)
  */
 class SkSVGUse final : public SkSVGTransformableNode {
 public:

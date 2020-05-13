@@ -14,6 +14,7 @@ DEPS = [
   'recipe_engine/context',
   'recipe_engine/file',
   'recipe_engine/path',
+  'recipe_engine/platform',
   'recipe_engine/properties',
   'recipe_engine/python',
   'recipe_engine/raw_io',
@@ -61,12 +62,9 @@ def skpbench_steps(api):
         # TODO(dogben): Track down what's causing bots to die.
         '-v5']
   if 'DDL' in api.vars.builder_name:
-    # This adds the "--ddl" flag for both DDLTotal and DDLRecord
     skpbench_args += ['--ddl']
     # disable the mask generation threads for sanity's sake in DDL mode
     skpbench_args += ['--gpuThreads', '0']
-  if 'DDLRecord' in api.vars.builder_name:
-    skpbench_args += ['--ddlRecord']
   if '9x9' in api.vars.builder_name:
     skpbench_args += [
         '--ddlNumAdditionalThreads', 9,
@@ -77,10 +75,11 @@ def skpbench_steps(api):
         '--adb_binary', ADB_BINARY]
   if 'CCPR' in api.vars.builder_name:
     skpbench_args += [
-        '--pr', 'ccpr',
-        '--nocache',
+        '--pr', 'ccpr', '--cc', '--nocache',
         api.path.join(api.flavor.device_dirs.skp_dir, 'desk_*svg.skp'),
         api.path.join(api.flavor.device_dirs.skp_dir, 'desk_chalkboard.skp')]
+  elif 'Mskp' in api.vars.builder_name:
+    skpbench_args += [api.flavor.device_dirs.mskp_dir]
   else:
     skpbench_args += [api.flavor.device_dirs.skp_dir]
 
@@ -127,10 +126,15 @@ def skpbench_steps(api):
 def RunSteps(api):
   api.vars.setup()
   api.file.ensure_directory('makedirs tmp_dir', api.vars.tmp_dir)
-  api.flavor.setup()
+
+  # The app_name passed to api.flavor.setup() is used to determine which app
+  # to install on an attached device. That work is done in skpbench_steps, so
+  # we pass None here.
+  api.flavor.setup(None)
 
   try:
-    api.flavor.install(skps=True)
+    mksp_mode = ('Mskp' in api.vars.builder_name)
+    api.flavor.install(skps=not mksp_mode, mskps=mksp_mode)
     skpbench_steps(api)
   finally:
     api.flavor.cleanup_steps()
@@ -139,12 +143,12 @@ def RunSteps(api):
 
 TEST_BUILDERS = [
   ('Perf-Android-Clang-Pixel-GPU-Adreno530-arm64-Release-All-'
+   'Android_Skpbench_Mskp'),
+  ('Perf-Android-Clang-Pixel-GPU-Adreno530-arm64-Release-All-'
    'Android_CCPR_Skpbench'),
   'Perf-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Release-All-Vulkan_Skpbench',
   ('Perf-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Release-All-'
    'Vulkan_Skpbench_DDLTotal_9x9'),
-  ('Perf-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Release-All-'
-   'Vulkan_Skpbench_DDLRecord_9x9'),
 ]
 
 
@@ -166,7 +170,8 @@ def GenTests(api):
       api.step_data('get swarming task id',
           stdout=api.raw_io.output('123456'))
     )
-
+    if 'Win' in builder and not 'LenovoYogaC630' in builder:
+      test += api.platform('win', 64)
     yield test
 
   b = ('Perf-Android-Clang-Pixel2XL-GPU-Adreno540-arm64-Release-All-'

@@ -8,14 +8,14 @@
 #ifndef SkSVGRenderContext_DEFINED
 #define SkSVGRenderContext_DEFINED
 
-#include "SkPaint.h"
-#include "SkPath.h"
-#include "SkRect.h"
-#include "SkSize.h"
-#include "SkSVGAttribute.h"
-#include "SkSVGIDMapper.h"
-#include "SkTLazy.h"
-#include "SkTypes.h"
+#include "experimental/svg/model/SkSVGAttribute.h"
+#include "experimental/svg/model/SkSVGIDMapper.h"
+#include "include/core/SkPaint.h"
+#include "include/core/SkPath.h"
+#include "include/core/SkRect.h"
+#include "include/core/SkSize.h"
+#include "include/core/SkTypes.h"
+#include "src/core/SkTLazy.h"
 
 class SkCanvas;
 class SkSVGLength;
@@ -77,7 +77,41 @@ public:
     };
     void applyPresentationAttributes(const SkSVGPresentationAttributes&, uint32_t flags);
 
-    const SkSVGNode* findNodeById(const SkString&) const;
+    // Scoped wrapper that temporarily clears the original node reference.
+    class BorrowedNode {
+    public:
+        explicit BorrowedNode(sk_sp<SkSVGNode>* node)
+            : fOwner(node) {
+            if (fOwner) {
+                fBorrowed = std::move(*fOwner);
+                *fOwner = nullptr;
+            }
+        }
+
+        ~BorrowedNode() {
+            if (fOwner) {
+                *fOwner = std::move(fBorrowed);
+            }
+        }
+
+        const SkSVGNode* get() const { return fBorrowed.get(); }
+        const SkSVGNode* operator->() const { return fBorrowed.get(); }
+        const SkSVGNode& operator*() const { return *fBorrowed; }
+
+        operator bool() const { return !!fBorrowed; }
+
+    private:
+        // noncopyable
+        BorrowedNode(const BorrowedNode&)      = delete;
+        BorrowedNode& operator=(BorrowedNode&) = delete;
+
+        sk_sp<SkSVGNode>* fOwner;
+        sk_sp<SkSVGNode>  fBorrowed;
+    };
+
+    // Note: the id->node association is cleared for the lifetime of the returned value
+    // (effectively breaks reference cycles, assuming appropriate return value scoping).
+    BorrowedNode findNodeById(const SkString&) const;
 
     const SkPaint* fillPaint() const;
     const SkPaint* strokePaint() const;
@@ -93,6 +127,7 @@ private:
 
     void applyOpacity(SkScalar opacity, uint32_t flags);
     void applyClip(const SkSVGClip&);
+    void updatePaintsWithCurrentColor(const SkSVGPresentationAttributes&);
 
     const SkSVGIDMapper&                          fIDMapper;
     SkTCopyOnFirstWrite<SkSVGLengthContext>       fLengthContext;

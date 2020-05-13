@@ -8,12 +8,12 @@
 #ifndef SKSL_FUNCTIONDECLARATION
 #define SKSL_FUNCTIONDECLARATION
 
-#include "SkSLExpression.h"
-#include "SkSLModifiers.h"
-#include "SkSLSymbol.h"
-#include "SkSLSymbolTable.h"
-#include "SkSLType.h"
-#include "SkSLVariable.h"
+#include "src/sksl/ir/SkSLExpression.h"
+#include "src/sksl/ir/SkSLModifiers.h"
+#include "src/sksl/ir/SkSLSymbol.h"
+#include "src/sksl/ir/SkSLSymbolTable.h"
+#include "src/sksl/ir/SkSLType.h"
+#include "src/sksl/ir/SkSLVariable.h"
 
 namespace SkSL {
 
@@ -30,16 +30,20 @@ struct FunctionDeclaration : public Symbol {
     , fParameters(std::move(parameters))
     , fReturnType(returnType) {}
 
-    String description() const override {
-        String result = fReturnType.description() + " " + fName + "(";
+    String declaration() const {
+        String result = fReturnType.displayName() + " " + fName + "(";
         String separator;
         for (auto p : fParameters) {
             result += separator;
             separator = ", ";
-            result += p->description();
+            result += p->fName;
         }
         result += ")";
         return result;
+    }
+
+    String description() const override {
+        return this->declaration();
     }
 
     bool matches(const FunctionDeclaration& f) const {
@@ -93,7 +97,9 @@ struct FunctionDeclaration : public Symbol {
             }
         }
         if (fReturnType.kind() == Type::kGeneric_Kind) {
-            SkASSERT(genericIndex != -1);
+            if (genericIndex == -1) {
+                return false;
+            }
             *outReturnType = fReturnType.coercibleTypes()[genericIndex];
         } else {
             *outReturnType = &fReturnType;

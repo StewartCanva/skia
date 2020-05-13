@@ -8,10 +8,11 @@
 #ifndef SKSL_BINARYEXPRESSION
 #define SKSL_BINARYEXPRESSION
 
-#include "SkSLExpression.h"
-#include "SkSLExpression.h"
-#include "../SkSLIRGenerator.h"
-#include "../SkSLLexer.h"
+#include "src/sksl/SkSLCompiler.h"
+#include "src/sksl/SkSLIRGenerator.h"
+#include "src/sksl/SkSLLexer.h"
+#include "src/sksl/ir/SkSLExpression.h"
+#include "src/sksl/ir/SkSLExpression.h"
 
 namespace SkSL {
 
@@ -26,6 +27,10 @@ struct BinaryExpression : public Expression {
     , fOperator(op)
     , fRight(std::move(right)) {}
 
+    bool isConstantOrUniform() const override {
+        return fLeft->isConstantOrUniform() && fRight->isConstantOrUniform();
+    }
+
     std::unique_ptr<Expression> constantPropagate(const IRGenerator& irGenerator,
                                                   const DefinitionMap& definitions) override {
         return irGenerator.constantFold(*fLeft,
@@ -33,9 +38,11 @@ struct BinaryExpression : public Expression {
                                         *fRight);
     }
 
-    bool hasSideEffects() const override {
-        return Compiler::IsAssignment(fOperator) || fLeft->hasSideEffects() ||
-               fRight->hasSideEffects();
+    bool hasProperty(Property property) const override {
+        if (property == Property::kSideEffects && Compiler::IsAssignment(fOperator)) {
+            return true;
+        }
+        return fLeft->hasProperty(property) || fRight->hasProperty(property);
     }
 
     std::unique_ptr<Expression> clone() const override {

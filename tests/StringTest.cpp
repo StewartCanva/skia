@@ -5,16 +5,13 @@
  * found in the LICENSE file.
  */
 
-#include "Test.h"
+#include "tests/Test.h"
 
-#include "SkString.h"
-#include "SkStringUtils.h"
+#include "include/core/SkString.h"
+#include "src/core/SkStringUtils.h"
 
-#include <stdarg.h>
 #include <stdio.h>
 #include <thread>
-
-static const char* gThirtyWideDecimal = "%30d";
 
 DEF_TEST(String, reporter) {
     SkString    a;
@@ -166,24 +163,12 @@ DEF_TEST(String, reporter) {
 
     REPORTER_ASSERT(reporter, SkStringPrintf("%i", 0).equals("0"));
 
-    char buffer [40];
-    memset(buffer, 'a', 40);
-    REPORTER_ASSERT(reporter, buffer[18] == 'a');
-    REPORTER_ASSERT(reporter, buffer[19] == 'a');
-    REPORTER_ASSERT(reporter, buffer[20] == 'a');
-    snprintf(buffer, 20, gThirtyWideDecimal, 0);
-    REPORTER_ASSERT(reporter, buffer[18] == ' ');
-    REPORTER_ASSERT(reporter, buffer[19] == 0);
-    REPORTER_ASSERT(reporter, buffer[20] == 'a');
-
-    REPORTER_ASSERT(reporter, SkStringPrintf("%i", 0).equals("0"));
-
     // 2000 is larger than the static buffer size inside SkString.cpp
     a = SkStringPrintf("%2000s", " ");
     REPORTER_ASSERT(reporter, a.size() == 2000);
     for (size_t i = 0; i < a.size(); ++i) {
         if (a[i] != ' ') {
-            ERRORF(reporter, "SkStringPrintf fail: a[%d] = '%c'", i, a[i]);
+            ERRORF(reporter, "SkStringPrintf fail: a[%zu] = '%c'", i, a[i]);
             break;
         }
     }
@@ -192,7 +177,7 @@ DEF_TEST(String, reporter) {
     REPORTER_ASSERT(reporter, a.size() == 2000);
     for (size_t i = 0; i < a.size(); ++i) {
         if (a[i] != ' ') {
-            ERRORF(reporter, "SkString::printf fail: a[%d] = '%c'", i, a[i]);
+            ERRORF(reporter, "SkString::printf fail: a[%zu] = '%c'", i, a[i]);
             break;
         }
     }
@@ -200,7 +185,7 @@ DEF_TEST(String, reporter) {
     REPORTER_ASSERT(reporter, a.size() == 4000);
     for (size_t i = 0; i < a.size(); ++i) {
         if (a[i] != ' ') {
-            ERRORF(reporter, "SkString::appendf fail: a[%d] = '%c'", i, a[i]);
+            ERRORF(reporter, "SkString::appendf fail: a[%zu] = '%c'", i, a[i]);
             break;
         }
     }

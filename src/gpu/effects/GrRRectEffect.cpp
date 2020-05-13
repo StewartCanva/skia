@@ -5,18 +5,18 @@
  * found in the LICENSE file.
  */
 
-#include "GrRRectEffect.h"
+#include "src/gpu/effects/GrRRectEffect.h"
 
-#include "GrConvexPolyEffect.h"
-#include "GrFragmentProcessor.h"
-#include "GrOvalEffect.h"
-#include "GrShaderCaps.h"
-#include "SkRRectPriv.h"
-#include "SkTLazy.h"
-#include "glsl/GrGLSLFragmentProcessor.h"
-#include "glsl/GrGLSLFragmentShaderBuilder.h"
-#include "glsl/GrGLSLProgramDataManager.h"
-#include "glsl/GrGLSLUniformHandler.h"
+#include "src/core/SkRRectPriv.h"
+#include "src/core/SkTLazy.h"
+#include "src/gpu/GrFragmentProcessor.h"
+#include "src/gpu/GrShaderCaps.h"
+#include "src/gpu/effects/GrConvexPolyEffect.h"
+#include "src/gpu/effects/GrOvalEffect.h"
+#include "src/gpu/glsl/GrGLSLFragmentProcessor.h"
+#include "src/gpu/glsl/GrGLSLFragmentShaderBuilder.h"
+#include "src/gpu/glsl/GrGLSLProgramDataManager.h"
+#include "src/gpu/glsl/GrGLSLUniformHandler.h"
 
 // The effects defined here only handle rrect radii >= kRadiusMin.
 static const SkScalar kRadiusMin = SK_ScalarHalf;
@@ -157,11 +157,12 @@ void GLCircularRRectEffect::emitCode(EmitArgs& args) {
     // edges correspond to components x, y, z, and w, respectively. When a side of the rrect has
     // only rectangular corners, that side's value corresponds to the rect edge's value outset by
     // half a pixel.
-    fInnerRectUniform = uniformHandler->addUniform(kFragment_GrShaderFlag, kFloat4_GrSLType,
+    fInnerRectUniform = uniformHandler->addUniform(&crre, kFragment_GrShaderFlag, kFloat4_GrSLType,
                                                    "innerRect", &rectName);
     // x is (r + .5) and y is 1/(r + .5)
-    fRadiusPlusHalfUniform = uniformHandler->addUniform(kFragment_GrShaderFlag, kHalf2_GrSLType,
-                                                        "radiusPlusHalf", &radiusPlusHalfName);
+    fRadiusPlusHalfUniform = uniformHandler->addUniform(&crre, kFragment_GrShaderFlag,
+                                                        kHalf2_GrSLType, "radiusPlusHalf",
+                                                        &radiusPlusHalfName);
 
     // If we're on a device where float != fp32 then the length calculation could overflow.
     SkString clampedCircleDistance;
@@ -285,7 +286,7 @@ void GLCircularRRectEffect::emitCode(EmitArgs& args) {
 void GLCircularRRectEffect::GenKey(const GrProcessor& processor, const GrShaderCaps&,
                                    GrProcessorKeyBuilder* b) {
     const CircularRRectEffect& crre = processor.cast<CircularRRectEffect>();
-    GR_STATIC_ASSERT(kGrClipEdgeTypeCnt <= 8);
+    static_assert(kGrClipEdgeTypeCnt <= 8);
     b->add32((crre.getCircularCornerFlags() << 3) | (int) crre.getEdgeType());
 }
 
@@ -503,7 +504,7 @@ void GLEllipticalRRectEffect::emitCode(EmitArgs& args) {
     GrGLSLUniformHandler* uniformHandler = args.fUniformHandler;
     const char *rectName;
     // The inner rect is the rrect bounds inset by the x/y radii
-    fInnerRectUniform = uniformHandler->addUniform(kFragment_GrShaderFlag, kFloat4_GrSLType,
+    fInnerRectUniform = uniformHandler->addUniform(&erre, kFragment_GrShaderFlag, kFloat4_GrSLType,
                                                    "innerRect", &rectName);
 
     GrGLSLFPFragmentBuilder* fragBuilder = args.fFragBuilder;
@@ -527,16 +528,17 @@ void GLEllipticalRRectEffect::emitCode(EmitArgs& args) {
     // radii uniform values are already in this normalized space.
     const char* scaleName = nullptr;
     if (!args.fShaderCaps->floatIs32Bits()) {
-        fScaleUniform = uniformHandler->addUniform(kFragment_GrShaderFlag, kHalf2_GrSLType, "scale",
-                                                   &scaleName);
+        fScaleUniform = uniformHandler->addUniform(&erre, kFragment_GrShaderFlag, kHalf2_GrSLType,
+                                                   "scale", &scaleName);
     }
 
     // The uniforms with the inv squared radii are highp to prevent underflow.
     switch (erre.getRRect().getType()) {
         case SkRRect::kSimple_Type: {
             const char *invRadiiXYSqdName;
-            fInvRadiiSqdUniform = uniformHandler->addUniform(kFragment_GrShaderFlag,
-                                                             kHalf2_GrSLType,
+            fInvRadiiSqdUniform = uniformHandler->addUniform(&erre,
+                                                             kFragment_GrShaderFlag,
+                                                             kFloat2_GrSLType,
                                                              "invRadiiXY",
                                                              &invRadiiXYSqdName);
             fragBuilder->codeAppend("float2 dxy = max(max(dxy0, dxy1), 0.0);");
@@ -549,8 +551,9 @@ void GLEllipticalRRectEffect::emitCode(EmitArgs& args) {
         }
         case SkRRect::kNinePatch_Type: {
             const char *invRadiiLTRBSqdName;
-            fInvRadiiSqdUniform = uniformHandler->addUniform(kFragment_GrShaderFlag,
-                                                             kHalf4_GrSLType,
+            fInvRadiiSqdUniform = uniformHandler->addUniform(&erre,
+                                                             kFragment_GrShaderFlag,
+                                                             kFloat4_GrSLType,
                                                              "invRadiiLTRB",
                                                              &invRadiiLTRBSqdName);
             if (scaleName) {
@@ -592,7 +595,7 @@ void GLEllipticalRRectEffect::emitCode(EmitArgs& args) {
 void GLEllipticalRRectEffect::GenKey(const GrProcessor& effect, const GrShaderCaps&,
                                      GrProcessorKeyBuilder* b) {
     const EllipticalRRectEffect& erre = effect.cast<EllipticalRRectEffect>();
-    GR_STATIC_ASSERT((int) GrClipEdgeType::kLast < (1 << 3));
+    static_assert((int)GrClipEdgeType::kLast < (1 << 3));
     b->add32(erre.getRRect().getType() | (int) erre.getEdgeType() << 3);
 }
 
@@ -632,7 +635,7 @@ void GLEllipticalRRectEffect::onSetData(const GrGLSLProgramDataManager& pdman,
                 rect.fRight -= r1.fX;
                 rect.fBottom -= r1.fY;
                 if (fScaleUniform.isValid()) {
-                    float scale = SkTMax(SkTMax(r0.fX, r0.fY), SkTMax(r1.fX, r1.fY));
+                    float scale = std::max(std::max(r0.fX, r0.fY), std::max(r1.fX, r1.fY));
                     float scaleSqd = scale * scale;
                     pdman.set4f(fInvRadiiSqdUniform, scaleSqd / (r0.fX * r0.fX),
                                                      scaleSqd / (r0.fY * r0.fY),

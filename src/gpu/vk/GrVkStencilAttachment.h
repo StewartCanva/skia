@@ -8,9 +8,9 @@
 #ifndef GrVkStencil_DEFINED
 #define GrVkStencil_DEFINED
 
-#include "GrStencilAttachment.h"
-#include "GrVkImage.h"
-#include "vk/GrVkTypes.h"
+#include "include/gpu/vk/GrVkTypes.h"
+#include "src/gpu/GrStencilAttachment.h"
+#include "src/gpu/vk/GrVkImage.h"
 
 class GrVkImageView;
 class GrVkGpu;
@@ -20,8 +20,6 @@ public:
     struct Format {
         VkFormat  fInternalFormat;
         int  fStencilBits;
-        int  fTotalBits;
-        bool fPacked;
     };
 
     static GrVkStencilAttachment* Create(GrVkGpu* gpu, int width, int height,
@@ -29,10 +27,8 @@ public:
 
     ~GrVkStencilAttachment() override;
 
-    const GrVkResource* imageResource() const { return this->resource(); }
+    const GrManagedResource* imageResource() const { return this->resource(); }
     const GrVkImageView* stencilView() const { return fStencilView; }
-
-    VkFormat vkFormat() const { return fFormat.fInternalFormat; }
 
 protected:
     void onRelease() override;
@@ -49,8 +45,6 @@ private:
                           const GrVkImageView* stencilView);
 
     GrVkGpu* getVkGpu() const;
-
-    Format fFormat;
 
     const GrVkImageView*       fStencilView;
 };

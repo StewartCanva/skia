@@ -8,8 +8,8 @@
 #ifndef SkSVGStop_DEFINED
 #define SkSVGStop_DEFINED
 
-#include "SkSVGHiddenContainer.h"
-#include "SkSVGTypes.h"
+#include "experimental/svg/model/SkSVGHiddenContainer.h"
+#include "experimental/svg/model/SkSVGTypes.h"
 
 class SkSVGLengthContext;
 
@@ -21,11 +21,11 @@ public:
     }
 
     const SkSVGLength& offset() const { return fOffset; }
-    const SkSVGColorType& stopColor() const { return fStopColor; }
+    const SkSVGStopColor& stopColor() const { return fStopColor; }
     const SkSVGNumberType& stopOpacity() const { return fStopOpacity; }
 
     void setOffset(const SkSVGLength&);
-    void setStopColor(const SkSVGColorType&);
+    void setStopColor(const SkSVGStopColor&);
     void setStopOpacity(const SkSVGNumberType&);
 
 protected:
@@ -35,7 +35,7 @@ private:
     SkSVGStop();
 
     SkSVGLength          fOffset = SkSVGLength(0  , SkSVGLength::Unit::kPercentage);
-    SkSVGColorType    fStopColor = SkSVGColorType(SK_ColorBLACK);
+    SkSVGStopColor    fStopColor = SkSVGStopColor(SK_ColorBLACK);
     SkSVGNumberType fStopOpacity = SkSVGNumberType(1);
 
     typedef SkSVGHiddenContainer INHERITED;

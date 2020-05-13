@@ -5,11 +5,12 @@
  * found in the LICENSE file.
  */
 
-#include "SkDeferredDisplayListRecorder.h"
-#include "SkMessageBus.h"
-#include "SkDeferredDisplayList.h"
-#include "SkSurface.h"
-#include "SkSurfaceCharacterization.h"
+#include "include/core/SkDeferredDisplayListRecorder.h"
+
+#include "include/core/SkDeferredDisplayList.h"
+#include "include/core/SkSurface.h"
+#include "include/core/SkSurfaceCharacterization.h"
+#include "src/core/SkMessageBus.h"
 
 #if !SK_SUPPORT_GPU
 SkDeferredDisplayListRecorder::SkDeferredDisplayListRecorder(const SkSurfaceCharacterization&) {}
@@ -34,7 +35,8 @@ sk_sp<SkImage> SkDeferredDisplayListRecorder::makePromiseTexture(
         PromiseImageTextureFulfillProc textureFulfillProc,
         PromiseImageTextureReleaseProc textureReleaseProc,
         PromiseImageTextureDoneProc textureDoneProc,
-        PromiseImageTextureContext textureContext) {
+        PromiseImageTextureContext textureContext,
+        PromiseImageApiVersion) {
     return nullptr;
 }
 
@@ -50,23 +52,23 @@ sk_sp<SkImage> SkDeferredDisplayListRecorder::makeYUVAPromiseTexture(
         PromiseImageTextureFulfillProc textureFulfillProc,
         PromiseImageTextureReleaseProc textureReleaseProc,
         PromiseImageTextureDoneProc textureDoneProc,
-        PromiseImageTextureContext textureContexts[]) {
+        PromiseImageTextureContext textureContexts[],
+        PromiseImageApiVersion) {
     return nullptr;
 }
 
 #else
 
-#include "GrContextPriv.h"
-#include "GrProxyProvider.h"
-#include "GrRenderTargetContext.h"
-#include "GrTexture.h"
-#include "SkGr.h"
-#include "SkImage_Gpu.h"
-#include "SkImage_GpuYUVA.h"
-#include "SkMakeUnique.h"
-#include "SkPromiseImageTexture.h"
-#include "SkSurface_Gpu.h"
-#include "SkYUVASizeInfo.h"
+#include "include/core/SkPromiseImageTexture.h"
+#include "include/core/SkYUVASizeInfo.h"
+#include "src/gpu/GrContextPriv.h"
+#include "src/gpu/GrProxyProvider.h"
+#include "src/gpu/GrRenderTargetContext.h"
+#include "src/gpu/GrTexture.h"
+#include "src/gpu/SkGr.h"
+#include "src/image/SkImage_Gpu.h"
+#include "src/image/SkImage_GpuYUVA.h"
+#include "src/image/SkSurface_Gpu.h"
 
 SkDeferredDisplayListRecorder::SkDeferredDisplayListRecorder(const SkSurfaceCharacterization& c)
         : fCharacterization(c) {
@@ -106,6 +108,7 @@ bool SkDeferredDisplayListRecorder::init() {
                                                     new SkDeferredDisplayList::LazyProxyData);
 
     auto proxyProvider = fContext->priv().proxyProvider();
+    const GrCaps* caps = fContext->priv().caps();
 
     bool usesGLFBO0 = fCharacterization.usesGLFBO0();
     if (usesGLFBO0) {
@@ -127,12 +130,7 @@ bool SkDeferredDisplayListRecorder::init() {
         }
     }
 
-    GrSurfaceDesc desc;
-    desc.fFlags = kRenderTarget_GrSurfaceFlag;
-    desc.fWidth = fCharacterization.width();
-    desc.fHeight = fCharacterization.height();
-    desc.fConfig = fCharacterization.config();
-    desc.fSampleCnt = fCharacterization.stencilCount();
+    GrColorType grColorType = SkColorTypeToGrColorType(fCharacterization.colorType());
 
     sk_sp<SkDeferredDisplayList::LazyProxyData> lazyProxyData = fLazyProxyData;
 
@@ -141,13 +139,10 @@ bool SkDeferredDisplayListRecorder::init() {
     // DDL is being replayed into.
 
     GrInternalSurfaceFlags surfaceFlags = GrInternalSurfaceFlags::kNone;
-    if (fContext->priv().caps()->usesMixedSamples() && desc.fSampleCnt > 1 && !usesGLFBO0) {
-        // In GL, FBO 0 never supports mixed samples
-        surfaceFlags |= GrInternalSurfaceFlags::kMixedSampled;
-    }
     if (usesGLFBO0) {
         surfaceFlags |= GrInternalSurfaceFlags::kGLRTFBOIDIs0;
     }
+    // FIXME: Why do we use GrMipMapped::kNo instead of SkSurfaceCharacterization::fIsMipMapped?
     static constexpr GrProxyProvider::TextureInfo kTextureInfo{GrMipMapped::kNo,
                                                                GrTextureType::k2D};
     const GrProxyProvider::TextureInfo* optionalTextureInfo = nullptr;
@@ -155,35 +150,44 @@ bool SkDeferredDisplayListRecorder::init() {
         optionalTextureInfo = &kTextureInfo;
     }
 
-    const GrBackendFormat format = fContext->priv().caps()->getBackendFormatFromColorType(
-            fCharacterization.colorType());
+    GrSwizzle readSwizzle = caps->getReadSwizzle(fCharacterization.backendFormat(), grColorType);
 
     sk_sp<GrRenderTargetProxy> proxy = proxyProvider->createLazyRenderTargetProxy(
-            [lazyProxyData](GrResourceProvider* resourceProvider) {
-                if (!resourceProvider) {
-                    return sk_sp<GrSurface>();
-                }
-
+            [lazyProxyData](GrResourceProvider* resourceProvider,
+                            const GrSurfaceProxy::LazySurfaceDesc&) {
                 // The proxy backing the destination surface had better have been instantiated
-                // prior to the proxy backing the DLL's surface. Steal its GrRenderTarget.
+                // prior to the this one (i.e., the proxy backing the DLL's surface).
+                // Fulfill this lazy proxy with the destination surface's GrRenderTarget.
                 SkASSERT(lazyProxyData->fReplayDest->peekSurface());
-                return sk_ref_sp<GrSurface>(lazyProxyData->fReplayDest->peekSurface());
+                auto surface = sk_ref_sp<GrSurface>(lazyProxyData->fReplayDest->peekSurface());
+                return GrSurfaceProxy::LazyCallbackResult(std::move(surface));
             },
-            format,
-            desc,
-            fCharacterization.origin(),
+            fCharacterization.backendFormat(),
+            fCharacterization.dimensions(),
+            fCharacterization.sampleCount(),
             surfaceFlags,
             optionalTextureInfo,
+            GrMipMapsStatus::kNotAllocated,
             SkBackingFit::kExact,
             SkBudgeted::kYes,
-            fCharacterization.vulkanSecondaryCBCompatible());
+            fCharacterization.isProtected(),
+            fCharacterization.vulkanSecondaryCBCompatible(),
+            GrSurfaceProxy::UseAllocator::kYes);
 
-    sk_sp<GrSurfaceContext> c = fContext->priv().makeWrappedSurfaceContext(
-                                                                 std::move(proxy),
-                                                                 fCharacterization.refColorSpace(),
-                                                                 &fCharacterization.surfaceProps());
-    fSurface = SkSurface_Gpu::MakeWrappedRenderTarget(fContext.get(),
-                                                      sk_ref_sp(c->asRenderTargetContext()));
+    if (!proxy) {
+        return false;
+    }
+
+    GrSwizzle writeSwizzle = caps->getWriteSwizzle(fCharacterization.backendFormat(), grColorType);
+
+    GrSurfaceProxyView readView(proxy, fCharacterization.origin(), readSwizzle);
+    GrSurfaceProxyView writeView(std::move(proxy), fCharacterization.origin(), writeSwizzle);
+
+    auto rtc = std::make_unique<GrRenderTargetContext>(fContext.get(), std::move(readView),
+                                                       std::move(writeView), grColorType,
+                                                       fCharacterization.refColorSpace(),
+                                                       &fCharacterization.surfaceProps());
+    fSurface = SkSurface_Gpu::MakeWrappedRenderTarget(fContext.get(), std::move(rtc));
     return SkToBool(fSurface.get());
 }
 
@@ -213,7 +217,7 @@ std::unique_ptr<SkDeferredDisplayList> SkDeferredDisplayListRecorder::detach() {
     auto ddl = std::unique_ptr<SkDeferredDisplayList>(
                            new SkDeferredDisplayList(fCharacterization, std::move(fLazyProxyData)));
 
-    fContext->priv().moveOpListsToDDL(ddl.get());
+    fContext->priv().moveRenderTasksToDDL(ddl.get());
 
     // We want a new lazy proxy target for each recorded DDL so force the (lazy proxy-backed)
     // SkSurface to be regenerated for each DDL.
@@ -233,7 +237,8 @@ sk_sp<SkImage> SkDeferredDisplayListRecorder::makePromiseTexture(
         PromiseImageTextureFulfillProc textureFulfillProc,
         PromiseImageTextureReleaseProc textureReleaseProc,
         PromiseImageTextureDoneProc textureDoneProc,
-        PromiseImageTextureContext textureContext) {
+        PromiseImageTextureContext textureContext,
+        PromiseImageApiVersion version) {
     if (!fContext) {
         return nullptr;
     }
@@ -250,7 +255,8 @@ sk_sp<SkImage> SkDeferredDisplayListRecorder::makePromiseTexture(
                                            textureFulfillProc,
                                            textureReleaseProc,
                                            textureDoneProc,
-                                           textureContext);
+                                           textureContext,
+                                           version);
 }
 
 sk_sp<SkImage> SkDeferredDisplayListRecorder::makeYUVAPromiseTexture(
@@ -265,7 +271,8 @@ sk_sp<SkImage> SkDeferredDisplayListRecorder::makeYUVAPromiseTexture(
         PromiseImageTextureFulfillProc textureFulfillProc,
         PromiseImageTextureReleaseProc textureReleaseProc,
         PromiseImageTextureDoneProc textureDoneProc,
-        PromiseImageTextureContext textureContexts[]) {
+        PromiseImageTextureContext textureContexts[],
+        PromiseImageApiVersion version) {
     if (!fContext) {
         return nullptr;
     }
@@ -282,7 +289,8 @@ sk_sp<SkImage> SkDeferredDisplayListRecorder::makeYUVAPromiseTexture(
                                                    textureFulfillProc,
                                                    textureReleaseProc,
                                                    textureDoneProc,
-                                                   textureContexts);
+                                                   textureContexts,
+                                                   version);
 }
 
 #endif

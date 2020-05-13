@@ -5,10 +5,10 @@
  * found in the LICENSE file.
  */
 
-#include "SkCpu.h"
-#include "SkHalf.h"
-#include "SkOnce.h"
-#include "SkOpts.h"
+#include "include/private/SkHalf.h"
+#include "include/private/SkOnce.h"
+#include "src/core/SkCpu.h"
+#include "src/core/SkOpts.h"
 
 #if defined(SK_ARM_HAS_NEON)
     #if defined(SK_ARM_HAS_CRC32)
@@ -16,6 +16,8 @@
     #else
         #define SK_OPTS_NS neon
     #endif
+#elif SK_CPU_SSE_LEVEL >= SK_CPU_SSE_LEVEL_SKX
+    #define SK_OPTS_NS skx
 #elif SK_CPU_SSE_LEVEL >= SK_CPU_SSE_LEVEL_AVX2
     #define SK_OPTS_NS avx2
 #elif SK_CPU_SSE_LEVEL >= SK_CPU_SSE_LEVEL_AVX
@@ -36,14 +38,16 @@
     #define SK_OPTS_NS portable
 #endif
 
-#include "SkBitmapProcState_opts.h"
-#include "SkBlitMask_opts.h"
-#include "SkBlitRow_opts.h"
-#include "SkChecksum_opts.h"
-#include "SkRasterPipeline_opts.h"
-#include "SkSwizzler_opts.h"
-#include "SkUtils_opts.h"
-#include "SkXfermode_opts.h"
+#include "src/core/SkCubicSolver.h"
+#include "src/opts/SkBitmapProcState_opts.h"
+#include "src/opts/SkBlitMask_opts.h"
+#include "src/opts/SkBlitRow_opts.h"
+#include "src/opts/SkChecksum_opts.h"
+#include "src/opts/SkRasterPipeline_opts.h"
+#include "src/opts/SkSwizzler_opts.h"
+#include "src/opts/SkUtils_opts.h"
+#include "src/opts/SkVM_opts.h"
+#include "src/opts/SkXfermode_opts.h"
 
 namespace SkOpts {
     // Define default function pointer values here...
@@ -55,6 +59,7 @@ namespace SkOpts {
 
     DEFINE_DEFAULT(blit_mask_d32_a8);
 
+    DEFINE_DEFAULT(blit_row_color32);
     DEFINE_DEFAULT(blit_row_s32a_opaque);
 
     DEFINE_DEFAULT(RGBA_to_BGRA);
@@ -72,9 +77,18 @@ namespace SkOpts {
     DEFINE_DEFAULT(memset32);
     DEFINE_DEFAULT(memset64);
 
+    DEFINE_DEFAULT(rect_memset16);
+    DEFINE_DEFAULT(rect_memset32);
+    DEFINE_DEFAULT(rect_memset64);
+
+    DEFINE_DEFAULT(cubic_solver);
+
     DEFINE_DEFAULT(hash_fn);
 
     DEFINE_DEFAULT(S32_alpha_D32_filter_DX);
+    DEFINE_DEFAULT(S32_alpha_D32_filter_DXDY);
+
+    DEFINE_DEFAULT(interpret_skvm);
 #undef DEFINE_DEFAULT
 
 #define M(st) (StageFn)SK_OPTS_NS::st,
@@ -97,6 +111,7 @@ namespace SkOpts {
     void Init_sse42();
     void Init_avx();
     void Init_hsw();
+    void Init_skx();
     void Init_crc32();
 
     static void init() {
@@ -117,6 +132,10 @@ namespace SkOpts {
         #if SK_CPU_SSE_LEVEL < SK_CPU_SSE_LEVEL_AVX
             if (SkCpu::Supports(SkCpu::AVX)) { Init_avx();   }
             if (SkCpu::Supports(SkCpu::HSW)) { Init_hsw();   }
+        #endif
+
+        #if SK_CPU_SSE_LEVEL < SK_CPU_SSE_LEVEL_SKX
+            if (SkCpu::Supports(SkCpu::SKX)) { Init_skx(); }
         #endif
 
     #elif defined(SK_CPU_ARM64)

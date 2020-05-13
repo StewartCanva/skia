@@ -5,19 +5,20 @@
  * found in the LICENSE file.
  */
 
-#include "GrDrawAtlasOp.h"
+#include "src/gpu/ops/GrDrawAtlasOp.h"
 
-#include "GrCaps.h"
-#include "GrDefaultGeoProcFactory.h"
-#include "GrDrawOpTest.h"
-#include "GrOpFlushState.h"
-#include "GrRecordingContext.h"
-#include "GrRecordingContextPriv.h"
-#include "GrSimpleMeshDrawOpHelper.h"
-#include "SkGr.h"
-#include "SkRSXform.h"
-#include "SkRandom.h"
-#include "SkRectPriv.h"
+#include "include/core/SkRSXform.h"
+#include "include/private/GrRecordingContext.h"
+#include "include/utils/SkRandom.h"
+#include "src/core/SkRectPriv.h"
+#include "src/gpu/GrCaps.h"
+#include "src/gpu/GrDefaultGeoProcFactory.h"
+#include "src/gpu/GrDrawOpTest.h"
+#include "src/gpu/GrOpFlushState.h"
+#include "src/gpu/GrProgramInfo.h"
+#include "src/gpu/GrRecordingContextPriv.h"
+#include "src/gpu/SkGr.h"
+#include "src/gpu/ops/GrSimpleMeshDrawOpHelper.h"
 
 namespace {
 
@@ -34,8 +35,12 @@ public:
 
     const char* name() const override { return "DrawAtlasOp"; }
 
-    void visitProxies(const VisitProxyFunc& func, VisitorType) const override {
-        fHelper.visitProxies(func);
+    void visitProxies(const VisitProxyFunc& func) const override {
+        if (fProgramInfo) {
+            fProgramInfo->visitFPProxies(func);
+        } else {
+            fHelper.visitProxies(func);
+        }
     }
 
 #ifdef SK_DEBUG
@@ -44,9 +49,18 @@ public:
 
     FixedFunctionFlags fixedFunctionFlags() const override;
 
-    GrProcessorSet::Analysis finalize(const GrCaps&, const GrAppliedClip*, GrFSAAType) override;
+    GrProcessorSet::Analysis finalize(const GrCaps&, const GrAppliedClip*,
+                                      bool hasMixedSampledCoverage, GrClampType) override;
 
 private:
+    GrProgramInfo* programInfo() override { return fProgramInfo; }
+
+    void onCreateProgramInfo(const GrCaps*,
+                             SkArenaAlloc*,
+                             const GrSurfaceProxyView* writeView,
+                             GrAppliedClip&&,
+                             const GrXferProcessor::DstProxyView&) override;
+
     void onPrepareDraws(Target*) override;
     void onExecute(GrOpFlushState*, const SkRect& chainBounds) override;
 
@@ -55,7 +69,7 @@ private:
     bool hasColors() const { return fHasColors; }
     int quadCount() const { return fQuadCount; }
 
-    CombineResult onCombineIfPossible(GrOp* t, const GrCaps&) override;
+    CombineResult onCombineIfPossible(GrOp* t, GrRecordingContext::Arenas*, const GrCaps&) override;
 
     struct Geometry {
         SkPMColor4f fColor;
@@ -69,20 +83,23 @@ private:
     int fQuadCount;
     bool fHasColors;
 
+    GrSimpleMesh* fMesh = nullptr;
+    GrProgramInfo* fProgramInfo = nullptr;
+
     typedef GrMeshDrawOp INHERITED;
 };
 
-static sk_sp<GrGeometryProcessor> make_gp(const GrShaderCaps* shaderCaps,
-                                          bool hasColors,
-                                          const SkPMColor4f& color,
-                                          const SkMatrix& viewMatrix) {
+static GrGeometryProcessor* make_gp(SkArenaAlloc* arena,
+                                    bool hasColors,
+                                    const SkPMColor4f& color,
+                                    const SkMatrix& viewMatrix) {
     using namespace GrDefaultGeoProcFactory;
     Color gpColor(color);
     if (hasColors) {
         gpColor.fType = Color::kPremulGrColorAttribute_Type;
     }
 
-    return GrDefaultGeoProcFactory::Make(shaderCaps, gpColor, Coverage::kSolid_Type,
+    return GrDefaultGeoProcFactory::Make(arena, gpColor, Coverage::kSolid_Type,
                                          LocalCoords::kHasExplicit_Type, viewMatrix);
 }
 
@@ -165,7 +182,7 @@ DrawAtlasOp::DrawAtlasOp(const Helper::MakeArgs& helperArgs, const SkPMColor4f& 
         currVertex += vertexStride;
     }
 
-    this->setTransformedBounds(bounds, viewMatrix, HasAABloat::kNo, IsZeroArea::kNo);
+    this->setTransformedBounds(bounds, viewMatrix, HasAABloat::kNo, IsHairline::kNo);
 }
 
 #ifdef SK_DEBUG
@@ -181,15 +198,28 @@ SkString DrawAtlasOp::dumpInfo() const {
 }
 #endif
 
-void DrawAtlasOp::onPrepareDraws(Target* target) {
+void DrawAtlasOp::onCreateProgramInfo(const GrCaps* caps,
+                                      SkArenaAlloc* arena,
+                                      const GrSurfaceProxyView* writeView,
+                                      GrAppliedClip&& appliedClip,
+                                      const GrXferProcessor::DstProxyView& dstProxyView) {
     // Setup geometry processor
-    sk_sp<GrGeometryProcessor> gp(make_gp(target->caps().shaderCaps(),
-                                          this->hasColors(),
-                                          this->color(),
-                                          this->viewMatrix()));
+    GrGeometryProcessor* gp = make_gp(arena,
+                                      this->hasColors(),
+                                      this->color(),
+                                      this->viewMatrix());
+
+    fProgramInfo = fHelper.createProgramInfo(caps, arena, writeView, std::move(appliedClip),
+                                             dstProxyView, gp, GrPrimitiveType::kTriangles);
+}
+
+void DrawAtlasOp::onPrepareDraws(Target* target) {
+    if (!fProgramInfo) {
+        this->createProgramInfo(target);
+    }
 
     int instanceCount = fGeoData.count();
-    size_t vertexStride = gp->vertexStride();
+    size_t vertexStride = fProgramInfo->primProc().vertexStride();
 
     int numQuads = this->quadCount();
     QuadHelper helper(target, vertexStride, numQuads);
@@ -207,14 +237,22 @@ void DrawAtlasOp::onPrepareDraws(Target* target) {
         memcpy(vertPtr, args.fVerts.begin(), allocSize);
         vertPtr += allocSize;
     }
-    helper.recordDraw(target, std::move(gp));
+
+    fMesh = helper.mesh();
 }
 
 void DrawAtlasOp::onExecute(GrOpFlushState* flushState, const SkRect& chainBounds) {
-    fHelper.executeDrawsAndUploads(this, flushState, chainBounds);
+    if (!fProgramInfo || !fMesh) {
+        return;
+    }
+
+    flushState->bindPipelineAndScissorClip(*fProgramInfo, chainBounds);
+    flushState->bindTextures(fProgramInfo->primProc(), nullptr, fProgramInfo->pipeline());
+    flushState->drawMesh(*fMesh);
 }
 
-GrOp::CombineResult DrawAtlasOp::onCombineIfPossible(GrOp* t, const GrCaps& caps) {
+GrOp::CombineResult DrawAtlasOp::onCombineIfPossible(GrOp* t, GrRecordingContext::Arenas*,
+                                                     const GrCaps& caps) {
     DrawAtlasOp* that = t->cast<DrawAtlasOp>();
 
     if (!fHelper.isCompatible(that->fHelper, caps, this->bounds(), that->bounds())) {
@@ -222,7 +260,7 @@ GrOp::CombineResult DrawAtlasOp::onCombineIfPossible(GrOp* t, const GrCaps& caps
     }
 
     // We currently use a uniform viewmatrix for this op.
-    if (!this->viewMatrix().cheapEqualTo(that->viewMatrix())) {
+    if (!SkMatrixPriv::CheapEqual(this->viewMatrix(), that->viewMatrix())) {
         return CombineResult::kCannotCombine;
     }
 
@@ -245,15 +283,16 @@ GrDrawOp::FixedFunctionFlags DrawAtlasOp::fixedFunctionFlags() const {
 }
 
 GrProcessorSet::Analysis DrawAtlasOp::finalize(
-        const GrCaps& caps, const GrAppliedClip* clip, GrFSAAType fsaaType) {
+        const GrCaps& caps, const GrAppliedClip* clip, bool hasMixedSampledCoverage,
+        GrClampType clampType) {
     GrProcessorAnalysisColor gpColor;
     if (this->hasColors()) {
         gpColor.setToUnknown();
     } else {
         gpColor.setToConstant(fColor);
     }
-    auto result = fHelper.finalizeProcessors(
-            caps, clip, fsaaType, GrProcessorAnalysisCoverage::kNone, &gpColor);
+    auto result = fHelper.finalizeProcessors(caps, clip, hasMixedSampledCoverage, clampType,
+                                             GrProcessorAnalysisCoverage::kNone, &gpColor);
     if (gpColor.isConstant(&fColor)) {
         fHasColors = false;
     }
@@ -332,7 +371,7 @@ GR_DRAW_OP_TEST_DEFINE(DrawAtlasOp) {
 
     SkMatrix viewMatrix = GrTest::TestMatrix(random);
     GrAAType aaType = GrAAType::kNone;
-    if (GrFSAAType::kUnifiedMSAA == fsaaType && random->nextBool()) {
+    if (numSamples > 1 && random->nextBool()) {
         aaType = GrAAType::kMSAA;
     }
 

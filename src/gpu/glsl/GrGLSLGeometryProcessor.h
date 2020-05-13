@@ -8,7 +8,7 @@
 #ifndef GrGLSLGeometryProcessor_DEFINED
 #define GrGLSLGeometryProcessor_DEFINED
 
-#include "GrGLSLPrimitiveProcessor.h"
+#include "src/gpu/glsl/GrGLSLPrimitiveProcessor.h"
 
 class GrGLSLGPBuilder;
 
@@ -26,7 +26,7 @@ protected:
     // A helper which subclasses can use to upload coord transform matrices in setData().
     void setTransformDataHelper(const SkMatrix& localMatrix,
                                 const GrGLSLProgramDataManager& pdman,
-                                FPCoordTransformIter*);
+                                const CoordTransformRange&);
 
     // Emit transformed local coords from the vertex shader as a uniform matrix and varying per
     // coord-transform. localCoordsVar must be a 2- or 3-component vector. If it is 3 then it is
@@ -47,6 +47,10 @@ protected:
         this->emitTransforms(vb, varyingHandler, uniformHandler, localCoordsVar, SkMatrix::I(),
                              handler);
     }
+
+    // TODO: doc
+    void emitTransformCode(GrGLSLVertexBuilder* vb,
+                           GrGLSLUniformHandler* uniformHandler) override;
 
     struct GrGPArgs {
         // Used to specify the output variable used by the GP to store its device position. It can
@@ -84,10 +88,20 @@ private:
 
     struct TransformUniform {
         UniformHandle  fHandle;
+        GrSLType       fType = kVoid_GrSLType;
         SkMatrix       fCurrentValue = SkMatrix::InvalidMatrix();
     };
 
     SkTArray<TransformUniform, true> fInstalledTransforms;
+
+    struct TransformInfo {
+        const char* fName;
+        GrSLType fType;
+        SkString fMatrix;
+        SkString fLocalCoords;
+        const GrFragmentProcessor* fFP;
+    };
+    SkTArray<TransformInfo> fTransformInfos;
 
     typedef GrGLSLPrimitiveProcessor INHERITED;
 };

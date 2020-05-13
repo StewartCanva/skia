@@ -5,12 +5,12 @@
  * found in the LICENSE file.
  */
 
-#include "GrContext.h"
-#include "GrContextPriv.h"
-#include "GrGpu.h"
-#include "SkCanvas.h"
-#include "SkSurface.h"
-#include "Test.h"
+#include "include/core/SkCanvas.h"
+#include "include/core/SkSurface.h"
+#include "include/gpu/GrContext.h"
+#include "src/gpu/GrContextPriv.h"
+#include "src/gpu/GrGpu.h"
+#include "tests/Test.h"
 
 static bool check_read(skiatest::Reporter* reporter, const SkBitmap& bitmap) {
     bool result = true;
@@ -25,7 +25,7 @@ static bool check_read(skiatest::Reporter* reporter, const SkBitmap& bitmap) {
     return result;
 }
 
-DEF_GPUTEST_FOR_RENDERING_CONTEXTS(GrOpListFlushCount, reporter, ctxInfo) {
+DEF_GPUTEST_FOR_RENDERING_CONTEXTS(GrOpsTaskFlushCount, reporter, ctxInfo) {
     GrContext* context = ctxInfo.grContext();
     GrGpu* gpu = context->priv().getGpu();
 
@@ -70,7 +70,7 @@ DEF_GPUTEST_FOR_RENDERING_CONTEXTS(GrOpListFlushCount, reporter, ctxInfo) {
     // In total we make 2000 oplists. Our current limit on max oplists between flushes is 100, so we
     // should do 20 flushes while executing oplists. Additionaly we always do 1 flush at the end of
     // executing all oplists. So in total we should see 21 flushes here.
-    REPORTER_ASSERT(reporter, gpu->stats()->numFinishFlushes() == 21);
+    REPORTER_ASSERT(reporter, gpu->stats()->numSubmitToGpus() == 21);
 
     SkBitmap readbackBitmap;
     readbackBitmap.allocN32Pixels(1000, 1);

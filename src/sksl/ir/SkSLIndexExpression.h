@@ -8,9 +8,9 @@
 #ifndef SKSL_INDEX
 #define SKSL_INDEX
 
-#include "SkSLContext.h"
-#include "SkSLExpression.h"
-#include "SkSLUtil.h"
+#include "src/sksl/SkSLContext.h"
+#include "src/sksl/SkSLUtil.h"
+#include "src/sksl/ir/SkSLExpression.h"
 
 namespace SkSL {
 
@@ -58,8 +58,8 @@ struct IndexExpression : public Expression {
         SkASSERT(fIndex->fType == *context.fInt_Type || fIndex->fType == *context.fUInt_Type);
     }
 
-    bool hasSideEffects() const override {
-        return fBase->hasSideEffects() || fIndex->hasSideEffects();
+    bool hasProperty(Property property) const override {
+        return fBase->hasProperty(property) || fIndex->hasProperty(property);
     }
 
     std::unique_ptr<Expression> clone() const override {

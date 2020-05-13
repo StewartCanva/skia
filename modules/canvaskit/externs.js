@@ -23,445 +23,827 @@
  */
 
 var CanvasKit = {
-	// public API (i.e. things we declare in the pre-js file)
-	Color: function() {},
-	/** @return {CanvasKit.SkRect} */
-	LTRBRect: function() {},
-	/** @return {CanvasKit.SkRect} */
-	XYWHRect: function() {},
-	/** @return {ImageData} */
-	ImageData: function() {},
+  // public API (i.e. things we declare in the pre-js file or in the cpp bindings)
+  Color: function() {},
+  Color4f: function() {},
+  /** @return {CanvasKit.SkRect} */
+  LTRBRect: function() {},
+  /** @return {CanvasKit.SkRect} */
+  XYWHRect: function() {},
+  /** @return {CanvasKit.SkRRect} */
+  RRectXY: function() {},
+  /** @return {ImageData} */
+  ImageData: function() {},
 
-	GetWebGLContext: function() {},
-	MakeBlurMaskFilter: function() {},
-	MakeCanvas: function() {},
-	MakeCanvasSurface: function() {},
-	MakeGrContext: function() {},
-	MakeImageShader: function() {},
-	/** @return {CanvasKit.SkImage} */
-	MakeImageFromEncoded: function() {},
-	/** @return {LinearCanvasGradient} */
-	MakeLinearGradientShader: function() {},
-	MakeOnScreenGLSurface: function() {},
-	MakePathFromCmds: function() {},
-	MakePathFromOp: function() {},
-	MakePathFromSVGString: function() {},
-	MakeRadialGradientShader: function() {},
-	MakeRenderTarget: function() {},
-	MakeSWCanvasSurface: function() {},
-	MakeManagedAnimation: function() {},
-	MakeSkDashPathEffect: function() {},
-	MakeSkVertices: function() {},
-	MakeSurface: function() {},
-	/** @return {RadialCanvasGradient} */
-	MakeTwoPointConicalGradientShader: function() {},
-	MakeWebGLCanvasSurface: function() {},
-	currentContext: function() {},
-	getColorComponents: function() {},
-	getSkDataBytes: function() {},
-	multiplyByAlpha: function() {},
-	setCurrentContext: function() {},
+  GetWebGLContext: function() {},
+  MakeBlurMaskFilter: function() {},
+  MakeCanvas: function() {},
+  MakeCanvasSurface: function() {},
+  MakeGrContext: function() {},
+  /** @return {CanvasKit.SkAnimatedImage} */
+  MakeAnimatedImageFromEncoded: function() {},
+  /** @return {CanvasKit.SkImage} */
+  MakeImage: function() {},
+  /** @return {CanvasKit.SkImage} */
+  MakeImageFromEncoded: function() {},
+  MakeOnScreenGLSurface: function() {},
+  MakePathFromCmds: function() {},
+  MakePathFromOp: function() {},
+  MakePathFromSVGString: function() {},
+  MakeRenderTarget: function() {},
+  MakeSkPicture: function() {},
+  MakeSWCanvasSurface: function() {},
+  MakeManagedAnimation: function() {},
+  MakeParticles: function() {},
+  MakeSkVertices: function() {},
+  MakeSurface: function() {},
+  MakeWebGLCanvasSurface: function() {},
+  /** @return {TypedArray} */
+  Malloc: function() {},
+  computeTonalColors: function() {},
+  currentContext: function() {},
+  getColorComponents: function() {},
+  getDecodeCacheLimitBytes: function() {},
+  getDecodeCacheUsageBytes: function() {},
+  getSkDataBytes: function() {},
+  multiplyByAlpha: function() {},
+  parseColorString: function() {},
+  setCurrentContext: function() {},
+  setDecodeCacheLimitBytes: function() {},
 
-	// private API (i.e. things declared in the bindings that we use
-	// in the pre-js file)
-	_MakeImage: function() {},
-	_MakeImageShader: function() {},
-	_MakeLinearGradientShader: function() {},
-	_MakePathFromCmds: function() {},
-	_MakeRadialGradientShader: function() {},
-	_MakeManagedAnimation: function() {},
-	_MakeSkDashPathEffect: function() {},
-	_MakeSkVertices: function() {},
-	_MakeTwoPointConicalGradientShader: function() {},
-	_decodeImage: function() {},
-	_drawShapedText: function() {},
-	_getRasterDirectSurface: function() {},
-	_getRasterN32PremulSurface: function() {},
+  // private API (i.e. things declared in the bindings that we use
+  // in the pre-js file)
+  _computeTonalColors: function() {},
+  _MakeImage: function() {},
+  _MakeLinearGradientShader: function() {},
+  _MakePathFromCmds: function() {},
+  _MakeRadialGradientShader: function() {},
+  _MakeSweepGradientShader: function() {},
+  _MakeManagedAnimation: function() {},
+  _MakeParticles: function() {},
+  _MakeSkPicture: function() {},
+  _MakeSkVertices: function() {},
+  _MakeTwoPointConicalGradientShader: function() {},
+  _decodeAnimatedImage: function() {},
+  _decodeImage: function() {},
+  _drawShapedText: function() {},
+  _getRasterDirectSurface: function() {},
+  _getRasterN32PremulSurface: function() {},
 
-	// The testing object is meant to expose internal functions
-	// for more fine-grained testing, e.g. parseColor
-	_testing: {},
+  // The testing object is meant to expose internal functions
+  // for more fine-grained testing, e.g. parseColor
+  _testing: {},
 
-	// Objects and properties on CanvasKit
+  // Objects and properties on CanvasKit
 
-	ShapedText: {
-		// public API (from C++ bindings)
-		getBounds: function() {},
-	},
+  GrContext: {
+    // public API (from C++ bindings)
+    getResourceCacheLimitBytes: function() {},
+    getResourceCacheUsageBytes: function() {},
+    releaseResourcesAndAbandonContext: function() {},
+    setResourceCacheLimitBytes: function() {},
+  },
 
-	SkCanvas: {
-		// public API (from C++ bindings)
-		clear: function() {},
-		clipPath: function() {},
-		clipRect: function() {},
-		concat: function() {},
-		drawArc: function() {},
-		drawImage: function() {},
-		drawImageRect: function() {},
-		drawLine: function() {},
-		drawOval: function() {},
-		drawPaint: function() {},
-		drawPath: function() {},
-		drawRect: function() {},
-		drawRoundRect: function() {},
-		drawShadow: function() {},
-		drawText: function() {},
-		drawTextBlob: function() {},
-		drawVertices: function() {},
-		flush: function() {},
-		getTotalMatrix: function() {},
-		makeSurface: function() {},
-		restore: function() {},
-		restoreToCount: function() {},
-		rotate: function() {},
-		save: function() {},
-		saveLayer: function() {},
-		scale: function() {},
-		skew: function() {},
-		translate: function() {},
+  ManagedAnimation: {
+    prototype: {
+      setColor: function() {},
+    },
+  },
 
-		// private API
-		_drawSimpleText: function() {},
-		_readPixels: function() {},
-		_writePixels: function() {},
-		delete: function() {},
-	},
+  Paragraph: {
+    // public API (from C++ bindings)
+    didExceedMaxLines: function() {},
+    getAlphabeticBaseline: function() {},
+    getGlyphPositionAtCoordinate: function() {},
+    getHeight: function() {},
+    getIdeographicBaseline: function() {},
+    getLongestLine: function() {},
+    getMaxIntrinsicWidth: function() {},
+    getMaxWidth: function() {},
+    getMinIntrinsicWidth: function() {},
+    getWordBoundary: function() {},
+    layout: function() {},
 
-	SkFont: {
-		// public API (from C++ bindings)
-		getScaleX: function() {},
-		getSize: function() {},
-		getSkewX: function() {},
-		getTypeface: function() {},
-		measureText: function() {},
-		setScaleX: function() {},
-		setSize: function() {},
-		setSkewX: function() {},
-		setTypeface: function() {},
-	},
+    // private API
+    /** @return {Float32Array} */
+    _getRectsForRange: function() {},
+  },
 
-	SkFontMgr: {
-		// public API (from C++ bindings)
-		RefDefault: function() {},
-		countFamilies: function() {},
+  ParagraphBuilder: {
+    Make: function() {},
+    addText: function() {},
+    build: function() {},
+    pop: function() {},
 
-		// private API
-		_makeTypefaceFromData: function() {},
-	},
+    prototype: {
+      pushStyle: function() {},
+    },
 
-	SkImage: {
-		// public API (from C++ bindings)
-		height: function() {},
-		width: function() {},
-		// private API
-		_encodeToData: function() {},
-		_encodeToDataWithFormat: function() {},
-	},
+    // private API
+    _Make: function() {},
+    _pushStyle: function() {},
+  },
 
-	SkMatrix: {
-		identity: function() {},
-		mapPoints: function() {},
-		multiply: function() {},
-		rotated: function() {},
-		scaled: function() {},
-		skewed: function() {},
-		translated: function() {},
-	},
+  SkRuntimeEffect: {
+    // public API (from C++ bindings)
+    Make: function() {},
 
-	SkPaint: {
-		// public API (from C++ bindings)
-		/** @return {CanvasKit.SkPaint} */
-		copy: function() {},
-		getBlendMode: function() {},
-		getColor: function() {},
-		getFilterQuality: function() {},
-		getStrokeCap: function() {},
-		getStrokeJoin: function() {},
-		getStrokeMiter: function() {},
-		getStrokeWidth: function() {},
-		setAntiAlias: function() {},
-		setBlendMode: function() {},
-		setColor: function() {},
-		setFilterQuality: function() {},
-		setMaskFilter: function() {},
-		setPathEffect: function() {},
-		setShader: function() {},
-		setStrokeCap: function() {},
-		setStrokeJoin: function() {},
-		setStrokeMiter: function() {},
-		setStrokeWidth: function() {},
-		setStyle: function() {},
+    // private API
+    _makeShader: function() {},
+    _makeShaderWithChildren: function() {},
+  },
 
-		//private API
-		delete: function() {},
-	},
+  ParagraphStyle: function() {},
+  RSXFormBuilder: function() {},
+  SkColorBuilder: function() {},
+  SkRectBuilder: function() {},
 
-	SkPath: {
-		// public API (from C++ bindings)
-		computeTightBounds: function() {},
-		contains: function() {},
-		/** @return {CanvasKit.SkPath} */
-		copy: function() {},
-		countPoints: function() {},
-		equals: function() {},
-		getBounds: function() {},
-		getFillType: function() {},
-		getPoint: function() {},
-		isEmpty: function() {},
-		isVolatile: function() {},
-		reset: function() {},
-		rewind: function() {},
-		setFillType: function() {},
-		setIsVolatile: function() {},
-		toSVGString: function() {},
+  ShapedText: {
+    // public API (from C++ bindings)
+    getBounds: function() {},
+  },
 
-		// private API
-		_addArc: function() {},
-		_addPath: function() {},
-		_addRect: function() {},
-		_addRoundRect: function() {},
-		_arc: function() {},
-		_arcTo: function() {},
-		_close: function() {},
-		_conicTo: function() {},
-		_cubicTo: function() {},
-		_dash: function() {},
-		_lineTo: function() {},
-		_moveTo: function() {},
-		_op: function() {},
-		_quadTo: function() {},
-		_rect: function() {},
-		_simplify: function() {},
-		_stroke: function() {},
-		_transform: function() {},
-		_trim: function() {},
-		delete: function() {},
-		dump: function() {},
-		dumpHex: function() {},
-	},
+  SkAnimatedImage: {
+    // public API (from C++ bindings)
+    decodeNextFrame: function() {},
+    getFrameCount: function() {},
+    getRepetitionCount: function() {},
+    height: function() {},
+    reset: function() {},
+    width: function() {},
+  },
 
-	SkRect: {
-		fLeft: {},
-		fTop: {},
-		fRight: {},
-		fBottom: {},
-	},
+  SkCanvas: {
+    // public API (from C++ bindings)
+    clipPath: function() {},
+    clipRRect: function() {},
+    clipRect: function() {},
+    drawAnimatedImage: function() {},
+    drawArc: function() {},
+    drawCircle: function() {},
+    drawDRRect:  function() {},
+    drawImage: function() {},
+    drawImageNine: function() {},
+    drawImageRect: function() {},
+    drawLine: function() {},
+    drawOval: function() {},
+    drawPaint: function() {},
+    drawParagraph: function() {},
+    drawPath: function() {},
+    drawPicture: function() {},
+    drawRRect:  function() {},
+    drawRect: function() {},
+    drawRoundRect: function() {},
+    drawText: function() {},
+    drawTextBlob: function() {},
+    drawVertices: function() {},
+    flush: function() {},
+    getSaveCount: function() {},
+    makeSurface: function() {},
+    markCTM: function() {},
+    findMarkedCTM: function() {},
+    restore: function() {},
+    restoreToCount: function() {},
+    rotate: function() {},
+    save: function() {},
+    saveLayer: function() {},
+    scale: function() {},
+    skew: function() {},
+    translate: function() {},
 
-	SkSurface: {
-		// public API (from C++ bindings)
-		/** @return {CanvasKit.SkCanvas} */
-		getCanvas: function() {},
-		/** @return {CanvasKit.SkImage} */
-		makeImageSnapshot: function() {},
-		makeSurface: function() {},
+    prototype: {
+      clear: function() {},
+      drawColor: function() {},
+      drawShadow: function() {},
+    },
 
-		// private API
-		_flush: function() {},
-		_getRasterN32PremulSurface: function() {},
-		delete: function() {},
-	},
+    // private API
+    _clear: function() {},
+    _concat: function() {},
+    _drawAtlas: function() {},
+    _drawColor: function() {},
+    _drawPoints: function() {},
+    _drawShadow: function() {},
+    _drawSimpleText: function() {},
+    _getLocalToCamera: function() {},
+    _getLocalToDevice: function() {},
+    _getLocalToWorld: function() {},
+    _getTotalMatrix: function() {},
+    _findMarkedCTM: function() {},
+    _readPixels: function() {},
+    _writePixels: function() {},
+    delete: function() {},
+  },
 
-	SkTextBlob: {
-		MakeFromText: function() {},
-		_MakeFromText: function() {},
-	},
+  SkColorFilter: {
+    // public API (from C++ bindings and JS interface)
+    MakeBlend: function() {},
+    MakeCompose: function() {},
+    MakeLerp: function() {},
+    MakeLinearToSRGBGamma: function() {},
+    MakeMatrix: function() {},
+    MakeSRGBToLinearGamma: function() {},
+    // private API (from C++ bindings)
+    _MakeBlend: function() {},
+    _makeMatrix: function() {},
+  },
 
-	SkVertices: {
-		// public API (from C++ bindings)
-		bounds: function() {},
-		mode: function() {},
-		uniqueID: function() {},
-		vertexCount: function() {},
+  SkColorMatrix: {
+    concat: function() {},
+    identity: function() {},
+    postTranslate: function() {},
+    rotated: function() {},
+    scaled: function() {},
+  },
 
-		// private API
-		/** @return {CanvasKit.SkVertices} */
-		_applyBones: function() {},
-	},
+  SkContourMeasureIter: {
+    next: function() {},
+  },
 
-	// Constants and Enums
-	gpu: {},
-	skottie: {},
+  SkContourMeasure: {
+    getPosTan: function() {},
+    getSegment: function() {},
+    isClosed: function() {},
+    length: function() {},
+  },
 
-	TRANSPARENT: {},
-	RED: {},
-	BLUE: {},
-	YELLOW: {},
-	CYAN: {},
-	BLACK: {},
-	WHITE: {},
+  SkFont: {
+    // public API (from C++ bindings)
+    getScaleX: function() {},
+    getSize: function() {},
+    getSkewX: function() {},
+    getTypeface: function() {},
+    measureText: function() {},
+    setHinting: function() {},
+    setLinearMetrics: function() {},
+    setScaleX: function() {},
+    setSize: function() {},
+    setSkewX: function() {},
+    setSubpixel: function() {},
+    setTypeface: function() {},
+    // private API (from C++ bindings)
+    _getWidths: function() {},
+  },
 
-	MOVE_VERB: {},
-	LINE_VERB: {},
-	QUAD_VERB: {},
-	CONIC_VERB: {},
-	CUBIC_VERB: {},
-	CLOSE_VERB: {},
+  SkFontMgr: {
+    // public API (from C++ and JS bindings)
+    FromData: function() {},
+    RefDefault: function() {},
+    countFamilies: function() {},
+    getFamilyName: function() {},
 
-	AlphaType: {
-		Opaque: {},
-		Premul: {},
-		Unpremul: {},
-	},
+    // private API
+    _makeTypefaceFromData: function() {},
+    _fromData: function() {},
+  },
 
-	BlendMode: {
-		Clear: {},
-		Src: {},
-		Dst: {},
-		SrcOver: {},
-		DstOver: {},
-		SrcIn: {},
-		DstIn: {},
-		SrcOut: {},
-		DstOut: {},
-		SrcATop: {},
-		DstATop: {},
-		Xor: {},
-		Plus: {},
-		Modulate: {},
-		Screen: {},
-		Overlay: {},
-		Darken: {},
-		Lighten: {},
-		ColorDodge: {},
-		ColorBurn: {},
-		HardLight: {},
-		SoftLight: {},
-		Difference: {},
-		Exclusion: {},
-		Multiply: {},
-		Hue: {},
-		Saturation: {},
-		Color: {},
-		Luminosity: {},
-	},
+  SkImage: {
+    // public API (from C++ bindings)
+    height: function() {},
+    width: function() {},
+    // private API
+    _encodeToData: function() {},
+    _encodeToDataWithFormat: function() {},
+    _makeShader: function() {},
+  },
 
-	BlurStyle: {
-		Normal: {},
-		Solid: {},
-		Outer: {},
-		Inner: {},
-	},
+  SkImageFilter: {
+    MakeBlur: function() {},
+    MakeColorFilter: function() {},
+    MakeCompose: function() {},
+    MakeMatrixTransform: function() {},
 
-	ClipOp: {
-		Difference: {},
-		Intersect: {},
-	},
+    // private API
+    _MakeMatrixTransform: function() {},
+  },
 
-	ColorType: {
-		Alpha_8: {},
-		RGB_565: {},
-		ARGB_4444: {},
-		RGBA_8888: {},
-		RGB_888x: {},
-		BGRA_8888: {},
-		RGBA_1010102: {},
-		RGB_101010x: {},
-		Gray_8: {},
-		RGBA_F16: {},
-		RGBA_F32: {},
-	},
+  // These are defined in interface.js
+  SkM44: {
+    identity: function() {},
+    invert: function() {},
+    multiply: function() {},
+    rotatedUnitSinCos: function() {},
+    rotated: function() {},
+    scaled: function() {},
+    translated: function() {},
+    lookat: function() {},
+    perspective: function() {},
+    rc: function() {},
+    transpose: function() {},
+  },
 
-	FillType: {
-		Winding: {},
-		EvenOdd: {},
-		InverseWinding: {},
-		InverseEvenOdd: {},
-	},
+  SkMatrix: {
+    identity: function() {},
+    invert: function() {},
+    mapPoints: function() {},
+    multiply: function() {},
+    rotated: function() {},
+    scaled: function() {},
+    skewed: function() {},
+    translated: function() {},
+  },
 
-	FilterQuality: {
-		None: {},
-		Low: {},
-		Medium: {},
-		High: {},
-	},
+  SkMaskFilter: {
+    MakeBlur: function() {},
+  },
 
-	ImageFormat: {
-		PNG: {},
-		JPEG: {},
-	},
+  SkPaint: {
+    // public API (from C++ bindings)
+    /** @return {CanvasKit.SkPaint} */
+    copy: function() {},
+    getBlendMode: function() {},
+    getColor: function() {},
+    getFilterQuality: function() {},
+    getStrokeCap: function() {},
+    getStrokeJoin: function() {},
+    getStrokeMiter: function() {},
+    getStrokeWidth: function() {},
+    setAntiAlias: function() {},
+    setBlendMode: function() {},
+    setFilterQuality: function() {},
+    setImageFilter: function() {},
+    setMaskFilter: function() {},
+    setPathEffect: function() {},
+    setShader: function() {},
+    setStrokeCap: function() {},
+    setStrokeJoin: function() {},
+    setStrokeMiter: function() {},
+    setStrokeWidth: function() {},
+    setStyle: function() {},
 
-	PaintStyle: {
-		Fill: {},
-		Stroke: {},
-		StrokeAndFill: {},
-	},
+    prototype: {
+      setColor: function() {},
+    },
 
-	PathOp: {
-		Difference: {},
-		Intersect: {},
-		Union: {},
-		XOR: {},
-		ReverseDifference: {},
-	},
+    // Private API
+    delete: function() {},
+    _getColor: function() {},
+    _setColor: function() {},
+  },
 
-	StrokeCap: {
-		Butt: {},
-		Round: {},
-		Square: {},
-	},
+  SkPathEffect: {
+    MakeCorner: function() {},
+    MakeDash: function() {},
+    MakeDiscrete: function() {},
 
-	StrokeJoin: {
-		Miter: {},
-		Round: {},
-		Bevel: {},
-	},
+    // Private C++ API
+    _MakeDash: function() {},
+  },
 
-	TextEncoding: {
-		UTF8: {},
-		UTF16: {},
-		UTF32: {},
-		GlyphID: {},
-	},
+  SkParticleEffect: {
+    // public API (from C++ bindings)
+    draw: function() {},
+    getEffectUniform: function() {},
+    getEffectUniformCount: function() {},
+    getEffectUniformFloatCount: function() {},
+    getEffectUniformName: function() {},
+    getParticleUniformCount: function() {},
+    getParticleUniformFloatCount: function() {},
+    getParticleUniformName: function() {},
+    getParticleUniform: function() {},
+    setPosition: function() {},
+    setRate: function() {},
+    start: function() {},
+    update: function() {},
 
-	TileMode: {
-		Clamp: {},
-		Repeat: {},
-		Mirror: {},
-		Decal: {},
-	},
+    // private API (from C++ bindings)
+    _effectUniformPtr: function() {},
+    _particleUniformPtr: function() {},
+  },
 
-	VertexMode: {
-		Triangles: {},
-		TrianglesStrip: {},
-		TriangleFan: {},
-	},
+  SkPath: {
+    // public API (from C++ bindings)
+    computeTightBounds: function() {},
+    contains: function() {},
+    /** @return {CanvasKit.SkPath} */
+    copy: function() {},
+    countPoints: function() {},
+    equals: function() {},
+    getBounds: function() {},
+    getFillType: function() {},
+    getPoint: function() {},
+    isEmpty: function() {},
+    isVolatile: function() {},
+    reset: function() {},
+    rewind: function() {},
+    setFillType: function() {},
+    setIsVolatile: function() {},
+    toSVGString: function() {},
 
-	// Things Enscriptem adds for us
+    // private API
+    _addArc: function() {},
+    _addOval: function() {},
+    _addPath: function() {},
+    _addRect: function() {},
+    _addPoly: function() {},
+    _addRoundRect: function() {},
+    _arc: function() {},
+    _arcTo: function() {},
+    _close: function() {},
+    _conicTo: function() {},
+    _cubicTo: function() {},
+    _dash: function() {},
+    _lineTo: function() {},
+    _moveTo: function() {},
+    _op: function() {},
+    _quadTo: function() {},
+    _rArcTo: function() {},
+    _rConicTo: function() {},
+    _rCubicTo: function() {},
+    _rLineTo: function() {},
+    _rMoveTo: function() {},
+    _rQuadTo: function() {},
+    _rect: function() {},
+    _simplify: function() {},
+    _stroke: function() {},
+    _transform: function() {},
+    _trim: function() {},
+    delete: function() {},
+    dump: function() {},
+    dumpHex: function() {},
+  },
 
-	/** Represents the heap of the WASM code
-	 * @type {ArrayBuffer}
-	 */
-	buffer: {},
-	/**
-	 * @type {Float32Array}
-	 */
-	HEAPF32: {},
-	/**
-	 * @type {Uint8Array}
-	 */
-	HEAPU8: {},
-	/**
-	 * @type {Uint16Array}
-	 */
-	HEAPU16: {},
-	/**
-	 * @type {Int32Array}
-	 */
-	HEAP32: {},
-	/**
-	 * @type {Uint32Array}
-	 */
-	HEAPU32: {},
-	_malloc: function() {},
-	_free: function() {},
-	onRuntimeInitialized: function() {},
+  SkPathMeasure: {
+    getLength: function() {},
+    getSegment: function() {},
+    getPosTan: function() {},
+    isClosed: function() {},
+    nextContour: function() {},
+  },
+
+  SkPicture: {
+    serialize: function() {},
+  },
+
+  SkPictureRecorder: {
+    beginRecording: function() {},
+    finishRecordingAsPicture: function() {},
+  },
+
+  SkRect: {
+    fLeft: {},
+    fTop: {},
+    fRight: {},
+    fBottom: {},
+  },
+
+  SkRRect: {
+    rect: {},
+    rx1: {},
+    ry1: {},
+    rx2: {},
+    ry2: {},
+    rx3: {},
+    ry3: {},
+    rx4: {},
+    ry4: {},
+  },
+
+  SkShader: {
+    Blend: function() {},
+    Color: function() {},
+    Empty: function() {},
+    Lerp: function() {},
+    MakeLinearGradient: function() {},
+    MakeRadialGradient: function() {},
+    MakeTwoPointConicalGradient: function() {},
+    MakeSweepGradient: function() {},
+
+    // private API (from C++ bindings)
+    _Color: function() {},
+  },
+
+  SkSurface: {
+    // public API (from C++ bindings)
+    /** @return {CanvasKit.SkCanvas} */
+    getCanvas: function() {},
+    /** @return {CanvasKit.SkImage} */
+    makeImageSnapshot: function() {},
+    makeSurface: function() {},
+    reportBackendType: function() {},
+    grContext: {},
+
+    // private API
+    _flush: function() {},
+    _getRasterN32PremulSurface: function() {},
+    delete: function() {},
+  },
+
+  SkTextBlob: {
+    // public API (both C++ and JS bindings)
+    MakeFromRSXform: function() {},
+    MakeFromText: function() {},
+    MakeOnPath: function() {},
+    // private API (from C++ bindings)
+    _MakeFromRSXform: function() {},
+    _MakeFromText: function() {},
+  },
+
+  // These are defined in interface.js
+  SkVector: {
+    add: function() {},
+    sub: function() {},
+    dot: function() {},
+    cross: function() {},
+    normalize: function() {},
+    mulScalar: function() {},
+    length: function() {},
+    lengthSquared: function() {},
+    dist: function() {},
+  },
+
+  SkVertices: {
+    // public API (from C++ bindings)
+    bounds: function() {},
+    mode: function() {},
+    uniqueID: function() {},
+    vertexCount: function() {},
+  },
+
+  _SkVerticesBuilder: {
+    colors: function() {},
+    detach: function() {},
+    indices: function() {},
+    positions: function() {},
+    texCoords: function() {},
+  },
+
+  TextStyle: function() {},
+
+  // Constants and Enums
+  gpu: {},
+  skottie: {},
+
+  TRANSPARENT: {},
+  BLACK: {},
+  WHITE: {},
+  RED: {},
+  GREEN: {},
+  BLUE: {},
+  YELLOW: {},
+  CYAN: {},
+  MAGENTA: {},
+
+  MOVE_VERB: {},
+  LINE_VERB: {},
+  QUAD_VERB: {},
+  CONIC_VERB: {},
+  CUBIC_VERB: {},
+  CLOSE_VERB: {},
+
+  NoDecoration: {},
+  UnderlineDecoration: {},
+  OverlineDecoration: {},
+  LineThroughDecoration: {},
+
+  SaveLayerInitWithPrevious: {},
+  SaveLayerF16ColorType: {},
+
+  Affinity: {
+    Upstream: {},
+    Downstream: {},
+  },
+
+  AlphaType: {
+    Opaque: {},
+    Premul: {},
+    Unpremul: {},
+  },
+
+  BlendMode: {
+    Clear: {},
+    Src: {},
+    Dst: {},
+    SrcOver: {},
+    DstOver: {},
+    SrcIn: {},
+    DstIn: {},
+    SrcOut: {},
+    DstOut: {},
+    SrcATop: {},
+    DstATop: {},
+    Xor: {},
+    Plus: {},
+    Modulate: {},
+    Screen: {},
+    Overlay: {},
+    Darken: {},
+    Lighten: {},
+    ColorDodge: {},
+    ColorBurn: {},
+    HardLight: {},
+    SoftLight: {},
+    Difference: {},
+    Exclusion: {},
+    Multiply: {},
+    Hue: {},
+    Saturation: {},
+    Color: {},
+    Luminosity: {},
+  },
+
+  BlurStyle: {
+    Normal: {},
+    Solid: {},
+    Outer: {},
+    Inner: {},
+  },
+
+  ClipOp: {
+    Difference: {},
+    Intersect: {},
+  },
+
+  ColorType: {
+    Alpha_8: {},
+    RGB_565: {},
+    ARGB_4444: {},
+    RGBA_8888: {},
+    RGB_888x: {},
+    BGRA_8888: {},
+    RGBA_1010102: {},
+    RGB_101010x: {},
+    Gray_8: {},
+    RGBA_F16: {},
+    RGBA_F32: {},
+  },
+
+  FillType: {
+    Winding: {},
+    EvenOdd: {},
+  },
+
+  FilterQuality: {
+    None: {},
+    Low: {},
+    Medium: {},
+    High: {},
+  },
+
+  FontSlant: {
+    Upright: {},
+    Italic: {},
+    Oblique: {},
+  },
+
+  FontHinting: {
+    None: {},
+    Slight: {},
+    Normal: {},
+    Full: {},
+  },
+
+  FontWeight: {
+    Invisible: {},
+    Thin: {},
+    ExtraLight: {},
+    Light: {},
+    Normal: {},
+    Medium: {},
+    SemiBold: {},
+    Bold: {},
+    ExtraBold: {},
+    Black: {},
+    ExtraBlack: {},
+  },
+
+  FontWidth: {
+    UltraCondensed: {},
+    ExtraCondensed: {},
+    Condensed: {},
+    SemiCondensed: {},
+    Normal: {},
+    SemiExpanded: {},
+    Expanded: {},
+    ExtraExpanded: {},
+    UltraExpanded: {},
+  },
+
+  ImageFormat: {
+    PNG: {},
+    JPEG: {},
+  },
+
+  PaintStyle: {
+    Fill: {},
+    Stroke: {},
+  },
+
+  PathOp: {
+    Difference: {},
+    Intersect: {},
+    Union: {},
+    XOR: {},
+    ReverseDifference: {},
+  },
+
+  PointMode: {
+    Points: {},
+    Lines: {},
+    Polygon: {},
+  },
+
+  RectHeightStyle: {
+    Tight: {},
+    Max: {},
+    IncludeLineSpacingMiddle: {},
+    IncludeLineSpacingTop: {},
+    IncludeLineSpacingBottom: {},
+  },
+
+  RectWidthStyle: {
+    Tight: {},
+    Max: {},
+  },
+
+  StrokeCap: {
+    Butt: {},
+    Round: {},
+    Square: {},
+  },
+
+  StrokeJoin: {
+    Miter: {},
+    Round: {},
+    Bevel: {},
+  },
+
+  TextAlign: {
+    Left: {},
+    Right: {},
+    Center: {},
+    Justify: {},
+    Start: {},
+    End: {},
+  },
+
+  TextDirection: {
+    LTR: {},
+    RTL: {},
+  },
+
+  TileMode: {
+    Clamp: {},
+    Repeat: {},
+    Mirror: {},
+    Decal: {},
+  },
+
+  VertexMode: {
+    Triangles: {},
+    TrianglesStrip: {},
+    TriangleFan: {},
+  },
+
+  // Things Enscriptem adds for us
+
+  /**
+   * @type {Float32Array}
+   */
+  HEAPF32: {},
+  /**
+   * @type {Float64Array}
+   */
+  HEAPF64: {},
+  /**
+   * @type {Uint8Array}
+   */
+  HEAPU8: {},
+  /**
+   * @type {Uint16Array}
+   */
+  HEAPU16: {},
+  /**
+   * @type {Uint32Array}
+   */
+  HEAPU32: {},
+  /**
+   * @type {Int8Array}
+   */
+  HEAP8: {},
+  /**
+   * @type {Int16Array}
+   */
+  HEAP16: {},
+  /**
+   * @type {Int32Array}
+   */
+  HEAP32: {},
+
+  _malloc: function() {},
+  _free: function() {},
+  onRuntimeInitialized: function() {},
 };
 
 // Public API things that are newly declared in the JS should go here.
 // It's not enough to declare them above, because closure can still erase them
 // unless they go on the prototype.
+CanvasKit.Paragraph.prototype.getRectsForRange = function() {};
+
 CanvasKit.SkPath.prototype.addArc = function() {};
+CanvasKit.SkPath.prototype.addOval = function() {};
 CanvasKit.SkPath.prototype.addPath = function() {};
+CanvasKit.SkPath.prototype.addPoly = function() {};
 CanvasKit.SkPath.prototype.addRect = function() {};
 CanvasKit.SkPath.prototype.addRoundRect = function() {};
 CanvasKit.SkPath.prototype.arc = function() {};
@@ -472,28 +854,64 @@ CanvasKit.SkPath.prototype.cubicTo = function() {};
 CanvasKit.SkPath.prototype.dash = function() {};
 CanvasKit.SkPath.prototype.lineTo = function() {};
 CanvasKit.SkPath.prototype.moveTo = function() {};
+CanvasKit.SkPath.prototype.offset = function() {};
 CanvasKit.SkPath.prototype.op = function() {};
 CanvasKit.SkPath.prototype.quadTo = function() {};
+CanvasKit.SkPath.prototype.rArcTo = function() {};
+CanvasKit.SkPath.prototype.rConicTo = function() {};
+CanvasKit.SkPath.prototype.rCubicTo = function() {};
+CanvasKit.SkPath.prototype.rLineTo = function() {};
+CanvasKit.SkPath.prototype.rMoveTo = function() {};
+CanvasKit.SkPath.prototype.rQuadTo = function() {};
 CanvasKit.SkPath.prototype.rect = function() {};
 CanvasKit.SkPath.prototype.simplify = function() {};
 CanvasKit.SkPath.prototype.stroke = function() {};
 CanvasKit.SkPath.prototype.transform = function() {};
 CanvasKit.SkPath.prototype.trim = function() {};
 
-CanvasKit.SkSurface.prototype.flush = function() {};
-CanvasKit.SkSurface.prototype.dispose = function() {};
+CanvasKit.SkPicture.prototype.saveAsFile = function() {};
 
-/** @return {CanvasKit.SkVertices} */
-CanvasKit.SkVertices.prototype.applyBones = function() {};
+CanvasKit.SkSurface.prototype.dispose = function() {};
+CanvasKit.SkSurface.prototype.flush = function() {};
+CanvasKit.SkSurface.prototype.requestAnimationFrame = function() {};
+CanvasKit.SkSurface.prototype.drawOnce = function() {};
+CanvasKit.SkSurface.prototype.captureFrameAsSkPicture = function() {};
 
 CanvasKit.SkImage.prototype.encodeToData = function() {};
+CanvasKit.SkImage.prototype.makeShader = function() {};
 
+CanvasKit.SkCanvas.prototype.concat = function() {};
+CanvasKit.SkCanvas.prototype.concat44 = function() {}; // deprecated
+CanvasKit.SkCanvas.prototype.drawAtlas = function() {};
+CanvasKit.SkCanvas.prototype.drawPoints = function() {};
 CanvasKit.SkCanvas.prototype.drawText = function() {};
+CanvasKit.SkCanvas.prototype.getLocalToCamera = function() {};
+CanvasKit.SkCanvas.prototype.getLocalToDevice = function() {};
+CanvasKit.SkCanvas.prototype.getLocalToWorld = function() {};
+CanvasKit.SkCanvas.prototype.getTotalMatrix = function() {};
 /** @return {Uint8Array} */
 CanvasKit.SkCanvas.prototype.readPixels = function() {};
 CanvasKit.SkCanvas.prototype.writePixels = function() {};
 
 CanvasKit.SkFontMgr.prototype.MakeTypefaceFromData = function() {};
+
+CanvasKit.SkFont.prototype.getWidths = function() {};
+
+CanvasKit.RSXFormBuilder.prototype.build = function() {};
+CanvasKit.RSXFormBuilder.prototype.delete = function() {};
+CanvasKit.RSXFormBuilder.prototype.push = function() {};
+CanvasKit.RSXFormBuilder.prototype.set = function() {};
+
+CanvasKit.SkColorBuilder.prototype.build = function() {};
+CanvasKit.SkColorBuilder.prototype.delete = function() {};
+CanvasKit.SkColorBuilder.prototype.push = function() {};
+CanvasKit.SkColorBuilder.prototype.set = function() {};
+
+CanvasKit.SkRuntimeEffect.prototype.makeShader = function() {};
+CanvasKit.SkRuntimeEffect.prototype.makeShaderWithChildren = function() {};
+
+CanvasKit.SkParticleEffect.prototype.effectUniforms = function() {};
+CanvasKit.SkParticleEffect.prototype.particleUniforms = function() {};
 
 // Define StrokeOpts object
 var StrokeOpts = {};
@@ -577,24 +995,22 @@ var CanvasPattern = {};
 CanvasPattern.prototype.setTransform = function() {};
 
 var ImageData = {
-	/**
-	 * @type {Uint8ClampedArray}
-	 */
-	data: {},
-	height: {},
-	width: {},
+  /**
+   * @type {Uint8ClampedArray}
+   */
+  data: {},
+  height: {},
+  width: {},
 };
 
 var DOMMatrix = {
-	a: {},
-	b: {},
-	c: {},
-	d: {},
-	e: {},
-	f: {},
+  a: {},
+  b: {},
+  c: {},
+  d: {},
+  e: {},
+  f: {},
 };
 
 // Not sure why this is needed - might be a bug in emsdk that this isn't properly declared.
 function loadWebAssemblyModule() {};
-
-var DOMMatrix = {};

@@ -8,8 +8,8 @@
 #ifndef SKSL_TYPEREFERENCE
 #define SKSL_TYPEREFERENCE
 
-#include "SkSLContext.h"
-#include "SkSLExpression.h"
+#include "src/sksl/SkSLContext.h"
+#include "src/sksl/ir/SkSLExpression.h"
 
 namespace SkSL {
 
@@ -22,7 +22,7 @@ struct TypeReference : public Expression {
     : INHERITED(offset, kTypeReference_Kind, *context.fInvalid_Type)
     , fValue(value) {}
 
-    bool hasSideEffects() const override {
+    bool hasProperty(Property property) const override {
         return false;
     }
 

@@ -8,8 +8,9 @@
 #ifndef SKSL_POSTFIXEXPRESSION
 #define SKSL_POSTFIXEXPRESSION
 
-#include "SkSLExpression.h"
-#include "SkSLLexer.h"
+#include "src/sksl/SkSLCompiler.h"
+#include "src/sksl/SkSLLexer.h"
+#include "src/sksl/ir/SkSLExpression.h"
 
 namespace SkSL {
 
@@ -22,8 +23,11 @@ struct PostfixExpression : public Expression {
     , fOperand(std::move(operand))
     , fOperator(op) {}
 
-    bool hasSideEffects() const override {
-        return true;
+    bool hasProperty(Property property) const override {
+        if (property == Property::kSideEffects) {
+            return true;
+        }
+        return fOperand->hasProperty(property);
     }
 
     std::unique_ptr<Expression> clone() const override {

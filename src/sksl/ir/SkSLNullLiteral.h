@@ -8,8 +8,8 @@
 #ifndef SKSL_NULLLITERAL
 #define SKSL_NULLLITERAL
 
-#include "SkSLContext.h"
-#include "SkSLExpression.h"
+#include "src/sksl/SkSLContext.h"
+#include "src/sksl/ir/SkSLExpression.h"
 
 namespace SkSL {
 
@@ -27,7 +27,7 @@ struct NullLiteral : public Expression {
         return "null";
     }
 
-    bool hasSideEffects() const override {
+    bool hasProperty(Property property) const override {
         return false;
     }
 

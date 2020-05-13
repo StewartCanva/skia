@@ -8,7 +8,7 @@
 #ifndef SkMathPriv_DEFINED
 #define SkMathPriv_DEFINED
 
-#include "SkMath.h"
+#include "include/core/SkMath.h"
 
 /**
  *  Return the integer square root of value, with a bias of bitBias
@@ -121,10 +121,6 @@ static inline unsigned SkDiv255Round(unsigned prod) {
     return (prod + (prod >> 8)) >> 8;
 }
 
-static inline float SkPinToUnitFloat(float x) {
-    return SkTMin(SkTMax(x, 0.0f), 1.0f);
-}
-
 /**
  * Swap byte order of a 4-byte value, e.g. 0xaarrggbb -> 0xbbggrraa.
  */
@@ -148,7 +144,7 @@ int SkCLZ_portable(uint32_t);
                 _BitScanReverse(&index, mask);
                 // Suppress this bogus /analyze warning. The check for non-zero
                 // guarantees that _BitScanReverse will succeed.
-#pragma warning(suppress : 6102) // Using 'index' from failed function call
+                #pragma warning(suppress : 6102) // Using 'index' from failed function call
                 return index ^ 0x1F;
             } else {
                 return 32;
@@ -160,8 +156,41 @@ int SkCLZ_portable(uint32_t);
             return mask ? __builtin_clz(mask) : 32;
         }
     #else
-        #define SkCLZ(x)    SkCLZ_portable(x)
+        static inline int SkCLZ(uint32_t mask) {
+            return SkCLZ_portable(mask);
+        }
     #endif
+#endif
+
+//! Returns the number of trailing zero bits (0...32)
+int SkCTZ_portable(uint32_t);
+
+#ifndef SkCTZ
+    #if defined(SK_BUILD_FOR_WIN)
+    #include <intrin.h>
+
+    static inline int SkCTZ(uint32_t mask) {
+        if (mask) {
+            unsigned long index;
+            _BitScanForward(&index, mask);
+            // Suppress this bogus /analyze warning. The check for non-zero
+            // guarantees that _BitScanReverse will succeed.
+            #pragma warning(suppress : 6102) // Using 'index' from failed function call
+            return index;
+        } else {
+            return 32;
+        }
+    }
+#elif defined(SK_CPU_ARM32) || defined(__GNUC__) || defined(__clang__)
+    static inline int SkCTZ(uint32_t mask) {
+        // __builtin_ctz(0) is undefined, so we have to detect that case.
+        return mask ? __builtin_ctz(mask) : 32;
+    }
+#else
+    static inline int SkCTZ(uint32_t mask) {
+        return SkCTZ_portable(mask);
+    }
+#endif
 #endif
 
 /**
@@ -215,7 +244,7 @@ static inline int SkPrevLog2(uint32_t value) {
 ///////////////////////////////////////////////////////////////////////////////
 
 /**
- *  Return the next power of 2 >= n.
+ *  Return the smallest power-of-2 >= n.
  */
 static inline uint32_t GrNextPow2(uint32_t n) {
     return n ? (1 << (32 - SkCLZ(n - 1))) : 1;

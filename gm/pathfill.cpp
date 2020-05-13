@@ -5,8 +5,16 @@
  * found in the LICENSE file.
  */
 
-#include "gm.h"
-#include "SkPath.h"
+#include "gm/gm.h"
+#include "include/core/SkCanvas.h"
+#include "include/core/SkColor.h"
+#include "include/core/SkPaint.h"
+#include "include/core/SkPath.h"
+#include "include/core/SkRect.h"
+#include "include/core/SkScalar.h"
+#include "include/core/SkSize.h"
+#include "include/core/SkString.h"
+#include "include/core/SkTypes.h"
 
 typedef SkScalar (*MakePathProc)(SkPath*);
 
@@ -118,8 +126,7 @@ static SkScalar make_star(SkPath* path, int n) {
     path->moveTo(c, c - r);
     for (int i = 1; i < n; i++) {
         rad += drad;
-        SkScalar cosV, sinV = SkScalarSinCos(rad, &cosV);
-        path->lineTo(c + cosV * r, c + sinV * r);
+        path->lineTo(c + SkScalarCos(rad) * r, c + SkScalarSin(rad) * r);
     }
     path->close();
     return r * 2 * 6 / 5;
@@ -609,5 +616,65 @@ DEF_SIMPLE_GM(bug7792, canvas, 800, 800) {
     path.lineTo(140, 75);
     path.moveTo(75, 75);
     path.close();
+    canvas->drawPath(path, p);
+}
+
+#include "include/core/SkSurface.h"
+
+DEF_SIMPLE_GM(path_stroke_clip_crbug1070835, canvas, 25, 50) {
+    SkCanvas* orig = canvas;
+    auto surf = SkSurface::MakeRasterN32Premul(25, 25);
+    canvas = surf->getCanvas();
+
+    SkPaint p;
+    p.setColor(SK_ColorRED);
+    p.setAntiAlias(true);
+    p.setStyle(SkPaint::kStroke_Style);
+    p.setStrokeWidth(2);
+
+    canvas->scale(4.16666651f/2, 4.16666651f/2);
+
+    SkPath path;
+
+    SkPoint pts[] = {
+    {11, 12},
+    {11, 18.0751324f},
+    {6.07513189f, 23},
+    {-4.80825292E-7f, 23},
+    {-6.07513332f, 23},
+    {-11, 18.0751324f},
+    {-11, 11.999999f},
+    {-10.999999f, 5.92486763f},
+    {-6.07513189f, 1},
+    {1.31173692E-7f, 1},
+    {6.07513141f, 1},
+    {10.9999981f, 5.92486572f},
+    {11, 11.9999971f},
+    };
+    path.moveTo(pts[0]).cubicTo(pts[1], pts[2], pts[3])
+                       .cubicTo(pts[4], pts[5], pts[6])
+                       .cubicTo(pts[7], pts[8], pts[9])
+                       .cubicTo(pts[10],pts[11],pts[12]);
+
+    canvas->drawPath(path, p);
+
+    surf->draw(orig, 0, 0, nullptr);
+}
+
+DEF_SIMPLE_GM(path_arcto_skbug_9077, canvas, 200, 200) {
+    SkPaint p;
+    p.setColor(SK_ColorRED);
+    p.setAntiAlias(true);
+    p.setStyle(SkPaint::kStroke_Style);
+    p.setStrokeWidth(2);
+
+    SkPath path;
+    SkPoint pts[] = { {20, 20}, {100, 20}, {100, 60}, {130, 150}, {180, 160} };
+    SkScalar radius = 60;
+    path.moveTo(pts[0]);
+    path.lineTo(pts[1]);
+    path.lineTo(pts[2]);
+    path.close();
+    path.arcTo(pts[3], pts[4], radius);
     canvas->drawPath(path, p);
 }

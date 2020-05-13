@@ -5,7 +5,7 @@
  * found in the LICENSE file.
  */
 
-#include "SkSVGAttribute.h"
+#include "experimental/svg/model/SkSVGAttribute.h"
 
 SkSVGPresentationAttributes SkSVGPresentationAttributes::MakeInitial() {
     SkSVGPresentationAttributes result;
@@ -25,6 +25,8 @@ SkSVGPresentationAttributes SkSVGPresentationAttributes::MakeInitial() {
     result.fStrokeWidth.set(SkSVGLength(1));
 
     result.fVisibility.set(SkSVGVisibility(SkSVGVisibility::Type::kVisible));
+
+    result.fColor.set(SkSVGColorType(SK_ColorBLACK));
 
     return result;
 }

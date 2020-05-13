@@ -5,23 +5,25 @@
  * found in the LICENSE file.
  */
 
-#include "Test.h"
+#include "tests/Test.h"
 
-#include "GrBackendSemaphore.h"
-#include "GrClip.h"
-#include "GrContextPriv.h"
-#include "GrDefaultGeoProcFactory.h"
-#include "GrOnFlushResourceProvider.h"
-#include "GrProxyProvider.h"
-#include "GrQuad.h"
-#include "GrRenderTargetContextPriv.h"
-#include "GrResourceProvider.h"
-#include "GrTexture.h"
-
-#include "SkBitmap.h"
-#include "SkPointPriv.h"
-#include "effects/GrSimpleTextureEffect.h"
-#include "ops/GrSimpleMeshDrawOpHelper.h"
+#include "include/core/SkBitmap.h"
+#include "include/gpu/GrBackendSemaphore.h"
+#include "src/core/SkPointPriv.h"
+#include "src/gpu/GrClip.h"
+#include "src/gpu/GrContextPriv.h"
+#include "src/gpu/GrDefaultGeoProcFactory.h"
+#include "src/gpu/GrImageInfo.h"
+#include "src/gpu/GrOnFlushResourceProvider.h"
+#include "src/gpu/GrProgramInfo.h"
+#include "src/gpu/GrProxyProvider.h"
+#include "src/gpu/GrRenderTargetContextPriv.h"
+#include "src/gpu/GrResourceProvider.h"
+#include "src/gpu/GrTexture.h"
+#include "src/gpu/effects/GrTextureEffect.h"
+#include "src/gpu/geometry/GrQuad.h"
+#include "src/gpu/ops/GrSimpleMeshDrawOpHelper.h"
+#include "tests/TestUtils.h"
 
 namespace {
 // This is a simplified mesh drawing op that can be used in the atlas generation test.
@@ -61,26 +63,31 @@ public:
             fLocalQuad = GrQuad(*localRect);
         }
         // Choose some conservative values for aa bloat and zero area.
-        this->setBounds(r, HasAABloat::kYes, IsZeroArea::kYes);
+        this->setBounds(r, HasAABloat::kYes, IsHairline::kYes);
     }
 
     const char* name() const override { return "NonAARectOp"; }
 
-    void visitProxies(const VisitProxyFunc& func, VisitorType) const override {
-        fHelper.visitProxies(func);
+    void visitProxies(const VisitProxyFunc& func) const override {
+        if (fProgramInfo) {
+            fProgramInfo->visitFPProxies(func);
+        } else {
+            fHelper.visitProxies(func);
+        }
     }
 
     FixedFunctionFlags fixedFunctionFlags() const override { return FixedFunctionFlags::kNone; }
 
     GrProcessorSet::Analysis finalize(
-            const GrCaps& caps, const GrAppliedClip*, GrFSAAType fsaaType) override {
+            const GrCaps& caps, const GrAppliedClip*, bool hasMixedSampledCoverage,
+            GrClampType clampType) override {
         // Set the color to unknown because the subclass may change the color later.
         GrProcessorAnalysisColor gpColor;
         gpColor.setToUnknown();
         // We ignore the clip so pass this rather than the GrAppliedClip param.
         static GrAppliedClip kNoClip;
-        return fHelper.finalizeProcessors(
-                caps, &kNoClip, fsaaType, GrProcessorAnalysisCoverage::kNone, &gpColor);
+        return fHelper.finalizeProcessors(caps, &kNoClip, hasMixedSampledCoverage, clampType,
+                                          GrProcessorAnalysisCoverage::kNone, &gpColor);
     }
 
 protected:
@@ -90,26 +97,45 @@ protected:
     SkRect      fRect;
 
 private:
-    void onPrepareDraws(Target* target) override {
+    GrProgramInfo* programInfo() override { return fProgramInfo; }
+
+    void onCreateProgramInfo(const GrCaps* caps,
+                             SkArenaAlloc* arena,
+                             const GrSurfaceProxyView* writeView,
+                             GrAppliedClip&& appliedClip,
+                             const GrXferProcessor::DstProxyView& dstProxyView) override {
         using namespace GrDefaultGeoProcFactory;
 
-        // The vertex attrib order is always pos, color, local coords.
-        static const int kColorOffset = sizeof(SkPoint);
-        static const int kLocalOffset = sizeof(SkPoint) + sizeof(GrColor);
-
-        sk_sp<GrGeometryProcessor> gp =
-                GrDefaultGeoProcFactory::Make(target->caps().shaderCaps(),
+        GrGeometryProcessor* gp = GrDefaultGeoProcFactory::Make(
+                                              arena,
                                               Color::kPremulGrColorAttribute_Type,
                                               Coverage::kSolid_Type,
                                               fHasLocalRect ? LocalCoords::kHasExplicit_Type
                                                             : LocalCoords::kUnused_Type,
                                               SkMatrix::I());
         if (!gp) {
-            SkDebugf("Couldn't create GrGeometryProcessor for GrAtlasedOp\n");
+            SkDebugf("Couldn't create GrGeometryProcessor\n");
             return;
         }
 
-        size_t vertexStride = gp->vertexStride();
+        fProgramInfo = fHelper.createProgramInfo(caps, arena, writeView, std::move(appliedClip),
+                                                 dstProxyView, gp, GrPrimitiveType::kTriangles);
+    }
+
+    void onPrepareDraws(Target* target) override {
+
+        // The vertex attrib order is always pos, color, local coords.
+        static const int kColorOffset = sizeof(SkPoint);
+        static const int kLocalOffset = sizeof(SkPoint) + sizeof(GrColor);
+
+        if (!fProgramInfo) {
+            this->createProgramInfo(target);
+            if (!fProgramInfo) {
+                return;
+            }
+        }
+
+        size_t vertexStride =  fProgramInfo->primProc().vertexStride();
 
         sk_sp<const GrBuffer> indexBuffer;
         int firstIndex;
@@ -155,18 +181,24 @@ private:
             }
         }
 
-        GrMesh* mesh = target->allocMesh(GrPrimitiveType::kTriangles);
-        mesh->setIndexed(indexBuffer, 6, firstIndex, 0, 3, GrPrimitiveRestart::kNo);
-        mesh->setVertexData(vertexBuffer, firstVertex);
-
-        target->recordDraw(std::move(gp), mesh);
+        fMesh = target->allocMesh();
+        fMesh->setIndexed(indexBuffer, 6, firstIndex, 0, 3, GrPrimitiveRestart::kNo, vertexBuffer,
+                          firstVertex);
     }
 
     void onExecute(GrOpFlushState* flushState, const SkRect& chainBounds) override {
-        fHelper.executeDrawsAndUploads(this, flushState, chainBounds);
+        if (!fProgramInfo || !fMesh) {
+            return;
+        }
+
+        flushState->bindPipelineAndScissorClip(*fProgramInfo, chainBounds);
+        flushState->bindTextures(fProgramInfo->primProc(), nullptr, fProgramInfo->pipeline());
+        flushState->drawMesh(*fMesh);
     }
 
-    Helper fHelper;
+    Helper         fHelper;
+    GrSimpleMesh*  fMesh = nullptr;
+    GrProgramInfo* fProgramInfo = nullptr;
 
     typedef GrMeshDrawOp INHERITED;
 };
@@ -231,7 +263,7 @@ private:
     static const GrColor kColors[kMaxIDs];
 
     int            fID;
-    // The Atlased ops have an internal singly-linked list of ops that land in the same opList
+    // The Atlased ops have an internal singly-linked list of ops that land in the same opsTask
     AtlasedRectOp* fNext;
 
     typedef NonAARectOp INHERITED;
@@ -264,7 +296,7 @@ static const int kAtlasTileSize = 2;
  */
 class AtlasObject final : public GrOnFlushCallbackObject {
 public:
-    AtlasObject() : fDone(false) { }
+    AtlasObject(skiatest::Reporter* reporter) : fDone(false), fReporter(reporter) {}
 
     ~AtlasObject() override {
         SkASSERT(fDone);
@@ -274,17 +306,17 @@ public:
         fDone = true;
     }
 
-    // Insert the new op in an internal singly-linked list for 'opListID'
-    void addOp(uint32_t opListID, AtlasedRectOp* op) {
+    // Insert the new op in an internal singly-linked list for 'opsTaskID'
+    void addOp(uint32_t opsTaskID, AtlasedRectOp* op) {
         LinkedListHeader* header = nullptr;
         for (int i = 0; i < fOps.count(); ++i) {
-            if (opListID == fOps[i].fID) {
+            if (opsTaskID == fOps[i].fID) {
                 header = &(fOps[i]);
             }
         }
 
         if (!header) {
-            fOps.push_back({opListID, nullptr});
+            fOps.push_back({opsTaskID, nullptr});
             header = &(fOps[fOps.count()-1]);
         }
 
@@ -296,50 +328,50 @@ public:
 
     // Get the fully lazy proxy that is backing the atlas. Its actual width isn't
     // known until flush time.
-    sk_sp<GrTextureProxy> getAtlasProxy(GrProxyProvider* proxyProvider, const GrCaps* caps) {
-        if (fAtlasProxy) {
-            return fAtlasProxy;
+    GrSurfaceProxyView getAtlasView(GrProxyProvider* proxyProvider, const GrCaps* caps) {
+        if (fAtlasView) {
+            return fAtlasView;
         }
 
-        const GrBackendFormat format = caps->getBackendFormatFromColorType(kRGBA_8888_SkColorType);
-
-        fAtlasProxy = GrProxyProvider::MakeFullyLazyProxy(
-                [](GrResourceProvider* resourceProvider) {
-                    if (!resourceProvider) {
-                        return sk_sp<GrTexture>();
-                    }
-
-                    GrSurfaceDesc desc;
-                    desc.fFlags = kRenderTarget_GrSurfaceFlag;
+        const GrBackendFormat format = caps->getDefaultBackendFormat(GrColorType::kRGBA_8888,
+                                                                     GrRenderable::kYes);
+        auto proxy = GrProxyProvider::MakeFullyLazyProxy(
+                [](GrResourceProvider* resourceProvider,
+                   const GrSurfaceProxy::LazySurfaceDesc& desc)
+                        -> GrSurfaceProxy::LazyCallbackResult {
+                    SkASSERT(desc.fDimensions.width() < 0 && desc.fDimensions.height() < 0);
+                    SkISize dims;
                     // TODO: until partial flushes in MDB lands we're stuck having
                     // all 9 atlas draws occur
-                    desc.fWidth = 9 /*this->numOps()*/ * kAtlasTileSize;
-                    desc.fHeight = kAtlasTileSize;
-                    desc.fConfig = kRGBA_8888_GrPixelConfig;
+                    dims.fWidth = 9 /*this->numOps()*/ * kAtlasTileSize;
+                    dims.fHeight = kAtlasTileSize;
 
-                    return resourceProvider->createTexture(desc, SkBudgeted::kYes,
-                                                           GrResourceProvider::Flags::kNoPendingIO);
+                    return resourceProvider->createTexture(dims, desc.fFormat, desc.fRenderable,
+                                                           desc.fSampleCnt, desc.fMipMapped,
+                                                           desc.fBudgeted, desc.fProtected);
                 },
                 format,
-                GrProxyProvider::Renderable::kYes,
-                kBottomLeft_GrSurfaceOrigin,
-                kRGBA_8888_GrPixelConfig,
-                *proxyProvider->caps());
-        return fAtlasProxy;
+                GrRenderable::kYes,
+                1,
+                GrProtected::kNo,
+                *proxyProvider->caps(),
+                GrSurfaceProxy::UseAllocator::kNo);
+
+        GrSwizzle readSwizzle = caps->getReadSwizzle(format, GrColorType::kRGBA_8888);
+        fAtlasView = {std::move(proxy), kBottomLeft_GrSurfaceOrigin, readSwizzle};
+        return fAtlasView;
     }
 
     /*
      * This callback creates the atlas and updates the AtlasedRectOps to read from it
      */
     void preFlush(GrOnFlushResourceProvider* resourceProvider,
-                  const uint32_t* opListIDs, int numOpListIDs,
-                  SkTArray<sk_sp<GrRenderTargetContext>>* results) override {
-        SkASSERT(!results->count());
-
-        // Until MDB is landed we will most-likely only have one opList.
+                  const uint32_t* opsTaskIDs,
+                  int numOpsTaskIDs) override {
+        // Until MDB is landed we will most-likely only have one opsTask.
         SkTDArray<LinkedListHeader*> lists;
-        for (int i = 0; i < numOpListIDs; ++i) {
-            if (LinkedListHeader* list = this->getList(opListIDs[i])) {
+        for (int i = 0; i < numOpsTaskIDs; ++i) {
+            if (LinkedListHeader* list = this->getList(opsTaskIDs[i])) {
                 lists.push_back(list);
             }
         }
@@ -348,18 +380,18 @@ public:
             return; // nothing to atlas
         }
 
-        if (!resourceProvider->instatiateProxy(fAtlasProxy.get())) {
+        if (!resourceProvider->instatiateProxy(fAtlasView.proxy())) {
             return;
         }
 
-        // At this point all the GrAtlasedOp's should have lined up to read from 'atlasDest' and
-        // there should either be two writes to clear it or no writes.
-        SkASSERT(9 == fAtlasProxy->getPendingReadCnt_TestOnly());
-        SkASSERT(2 == fAtlasProxy->getPendingWriteCnt_TestOnly() ||
-                 0 == fAtlasProxy->getPendingWriteCnt_TestOnly());
-        sk_sp<GrRenderTargetContext> rtc = resourceProvider->makeRenderTargetContext(
-                                                                           fAtlasProxy,
-                                                                           nullptr, nullptr);
+        // At this point 'fAtlasView' proxy should be instantiated and have:
+        //    1 ref from the 'fAtlasView' proxy sk_sp
+        //    9 refs from the 9 AtlasedRectOps
+        // The backing GrSurface should have only 1 though bc there is only one proxy
+        CheckSingleThreadedProxyRefs(fReporter, fAtlasView.proxy(), 10, 1);
+        auto rtc = resourceProvider->makeRenderTargetContext(
+                fAtlasView.refProxy(), fAtlasView.origin(), GrColorType::kRGBA_8888, nullptr,
+                nullptr);
 
         // clear the atlas
         rtc->clear(nullptr, SK_PMColor4fTRANSPARENT,
@@ -394,8 +426,6 @@ public:
             // We've updated all these ops and we certainly don't want to process them again
             this->clearOpsFor(lists[i]);
         }
-
-        results->push_back(std::move(rtc));
     }
 
 private:
@@ -404,9 +434,9 @@ private:
         AtlasedRectOp* fHead;
     } LinkedListHeader;
 
-    LinkedListHeader* getList(uint32_t opListID) {
+    LinkedListHeader* getList(uint32_t opsTaskID) {
         for (int i = 0; i < fOps.count(); ++i) {
-            if (opListID == fOps[i].fID) {
+            if (opsTaskID == fOps[i].fID) {
                 return &(fOps[i]);
             }
         }
@@ -417,39 +447,35 @@ private:
         // The AtlasedRectOps have yet to execute (and this class doesn't own them) so just
         // forget about them in the laziest way possible.
         header->fHead = nullptr;
-        header->fID = 0;            // invalid opList ID
+        header->fID = 0;            // invalid opsTask ID
     }
 
-    // Each opList containing AtlasedRectOps gets its own internal singly-linked list
-    SkTDArray<LinkedListHeader>  fOps;
+    // Each opsTask containing AtlasedRectOps gets its own internal singly-linked list
+    SkTDArray<LinkedListHeader> fOps;
 
     // The fully lazy proxy for the atlas
-    sk_sp<GrTextureProxy>        fAtlasProxy;
+    GrSurfaceProxyView fAtlasView;
 
     // Set to true when the testing harness expects this object to be no longer used
-    bool                         fDone;
+    bool fDone;
+
+    skiatest::Reporter* fReporter;
 };
 
 // This creates an off-screen rendertarget whose ops which eventually pull from the atlas.
-static sk_sp<GrTextureProxy> make_upstream_image(GrContext* context, AtlasObject* object, int start,
-                                                 sk_sp<GrTextureProxy> atlasProxy) {
-    const GrBackendFormat format =
-            context->priv().caps()->getBackendFormatFromColorType(kRGBA_8888_SkColorType);
-
-    sk_sp<GrRenderTargetContext> rtc(context->priv().makeDeferredRenderTargetContext(
-                                                                      format,
-                                                                      SkBackingFit::kApprox,
-                                                                      3*kDrawnTileSize,
-                                                                      kDrawnTileSize,
-                                                                      kRGBA_8888_GrPixelConfig,
-                                                                      nullptr));
+static GrSurfaceProxyView make_upstream_image(GrContext* context, AtlasObject* object, int start,
+                                              GrSurfaceProxyView atlasView,
+                                              SkAlphaType atlasAlphaType) {
+    auto rtc = GrRenderTargetContext::Make(
+            context, GrColorType::kRGBA_8888, nullptr, SkBackingFit::kApprox,
+            {3 * kDrawnTileSize, kDrawnTileSize});
 
     rtc->clear(nullptr, { 1, 0, 0, 1 }, GrRenderTargetContext::CanClearFullscreen::kYes);
 
     for (int i = 0; i < 3; ++i) {
         SkRect r = SkRect::MakeXYWH(i*kDrawnTileSize, 0, kDrawnTileSize, kDrawnTileSize);
 
-        auto fp = GrSimpleTextureEffect::Make(atlasProxy, SkMatrix::I());
+        auto fp = GrTextureEffect::Make(atlasView, atlasAlphaType);
         GrPaint paint;
         paint.addColorFragmentProcessor(std::move(fp));
         paint.setPorterDuffXPFactory(SkBlendMode::kSrc);
@@ -458,26 +484,26 @@ static sk_sp<GrTextureProxy> make_upstream_image(GrContext* context, AtlasObject
 
         AtlasedRectOp* sparePtr = op.get();
 
-        uint32_t opListID;
+        uint32_t opsTaskID;
         rtc->priv().testingOnly_addDrawOp(GrNoClip(), std::move(op),
-                                          [&opListID](GrOp* op, uint32_t id) { opListID = id; });
-        SkASSERT(SK_InvalidUniqueID != opListID);
+                                          [&opsTaskID](GrOp* op, uint32_t id) { opsTaskID = id; });
+        SkASSERT(SK_InvalidUniqueID != opsTaskID);
 
-        object->addOp(opListID, sparePtr);
+        object->addOp(opsTaskID, sparePtr);
     }
 
-    return rtc->asTextureProxyRef();
+    return rtc->readSurfaceView();
 }
 
 // Enable this if you want to debug the final draws w/o having the atlasCallback create the
 // atlas
 #if 0
-#include "SkImageEncoder.h"
 #include "SkGrPriv.h"
-#include "sk_tool_utils.h"
+#include "include/core/SkImageEncoder.h"
+#include "tools/ToolUtils.h"
 
 static void save_bm(const SkBitmap& bm, const char name[]) {
-    bool result = sk_tool_utils::EncodeImageToFile(name, bm, SkEncodedImageFormat::kPNG, 100);
+    bool result = ToolUtils::EncodeImageToFile(name, bm, SkEncodedImageFormat::kPNG, 100);
     SkASSERT(result);
 }
 
@@ -498,12 +524,11 @@ sk_sp<GrTextureProxy> pre_create_atlas(GrContext* context) {
     save_bm(bm, "atlas-fake.png");
 #endif
 
-    GrSurfaceDesc desc = GrImageInfoToSurfaceDesc(bm.info());
     desc.fFlags |= kRenderTarget_GrSurfaceFlag;
 
     sk_sp<GrSurfaceProxy> tmp = GrSurfaceProxy::MakeDeferred(*context->caps(),
                                                              context->textureProvider(),
-                                                             desc, SkBudgeted::kYes,
+                                                             dm.dimensions(), SkBudgeted::kYes,
                                                              bm.getPixels(), bm.rowBytes());
 
     return sk_ref_sp(tmp->asTextureProxy());
@@ -536,60 +561,52 @@ static void test_color(skiatest::Reporter* reporter, const SkBitmap& bm, int x, 
  *           R G B C M Y K Grey White
  */
 DEF_GPUTEST_FOR_GL_RENDERING_CONTEXTS(OnFlushCallbackTest, reporter, ctxInfo) {
-    static const int kNumProxies = 3;
+    static const int kNumViews = 3;
 
     GrContext* context = ctxInfo.grContext();
     auto proxyProvider = context->priv().proxyProvider();
 
-    AtlasObject object;
+    AtlasObject object(reporter);
 
     context->priv().addOnFlushCallbackObject(&object);
 
-    sk_sp<GrTextureProxy> proxies[kNumProxies];
-    for (int i = 0; i < kNumProxies; ++i) {
-        proxies[i] = make_upstream_image(context, &object, i*3,
-                                         object.getAtlasProxy(proxyProvider,
-                                                              context->priv().caps()));
+    GrSurfaceProxyView views[kNumViews];
+    for (int i = 0; i < kNumViews; ++i) {
+        views[i] = make_upstream_image(context, &object, i * 3,
+                                       object.getAtlasView(proxyProvider, context->priv().caps()),
+                                       kPremul_SkAlphaType);
     }
 
     static const int kFinalWidth = 6*kDrawnTileSize;
     static const int kFinalHeight = kDrawnTileSize;
 
-    const GrBackendFormat format =
-            context->priv().caps()->getBackendFormatFromColorType(kRGBA_8888_SkColorType);
-
-    sk_sp<GrRenderTargetContext> rtc(context->priv().makeDeferredRenderTargetContext(
-                                                                      format,
-                                                                      SkBackingFit::kApprox,
-                                                                      kFinalWidth,
-                                                                      kFinalHeight,
-                                                                      kRGBA_8888_GrPixelConfig,
-                                                                      nullptr));
+    auto rtc = GrRenderTargetContext::Make(
+            context, GrColorType::kRGBA_8888, nullptr, SkBackingFit::kApprox,
+            {kFinalWidth, kFinalHeight});
 
     rtc->clear(nullptr, SK_PMColor4fWHITE, GrRenderTargetContext::CanClearFullscreen::kYes);
 
     // Note that this doesn't include the third texture proxy
-    for (int i = 0; i < kNumProxies-1; ++i) {
+    for (int i = 0; i < kNumViews - 1; ++i) {
         SkRect r = SkRect::MakeXYWH(i*3*kDrawnTileSize, 0, 3*kDrawnTileSize, kDrawnTileSize);
 
         SkMatrix t = SkMatrix::MakeTrans(-i*3*kDrawnTileSize, 0);
 
         GrPaint paint;
-        auto fp = GrSimpleTextureEffect::Make(std::move(proxies[i]), t);
+        auto fp = GrTextureEffect::Make(std::move(views[i]), kPremul_SkAlphaType, t);
         paint.setPorterDuffXPFactory(SkBlendMode::kSrc);
         paint.addColorFragmentProcessor(std::move(fp));
 
         rtc->drawRect(GrNoClip(), std::move(paint), GrAA::kNo, SkMatrix::I(), r);
     }
 
-    rtc->prepareForExternalIO(SkSurface::BackendSurfaceAccess::kNoAccess,
-                              SkSurface::kNone_FlushFlags, 0, nullptr);
+    rtc->flush(SkSurface::BackendSurfaceAccess::kNoAccess, GrFlushInfo());
 
     SkBitmap readBack;
     readBack.allocN32Pixels(kFinalWidth, kFinalHeight);
 
     SkDEBUGCODE(bool result =) rtc->readPixels(readBack.info(), readBack.getPixels(),
-                                               readBack.rowBytes(), 0, 0);
+                                               readBack.rowBytes(), {0, 0});
     SkASSERT(result);
 
     context->priv().testingOnly_flushAndRemoveOnFlushCallbackObject(&object);

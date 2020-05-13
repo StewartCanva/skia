@@ -5,12 +5,11 @@
  * found in the LICENSE file.
  */
 
-#include "GrVkImage.h"
-#include "GrGpuResourcePriv.h"
-#include "GrVkGpu.h"
-#include "GrVkMemory.h"
-#include "GrVkTexture.h"
-#include "GrVkUtil.h"
+#include "src/gpu/vk/GrVkGpu.h"
+#include "src/gpu/vk/GrVkImage.h"
+#include "src/gpu/vk/GrVkMemory.h"
+#include "src/gpu/vk/GrVkTexture.h"
+#include "src/gpu/vk/GrVkUtil.h"
 
 #define VK_CALL(GPU, X) GR_VK_CALL(GPU->vkInterface(), X)
 
@@ -62,11 +61,10 @@ VkAccessFlags GrVkImage::LayoutToSrcAccessMask(const VkImageLayout layout) {
         flags = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
     } else if (VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL == layout) {
         flags = VK_ACCESS_TRANSFER_WRITE_BIT;
-    } else if (VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL == layout) {
-        flags = VK_ACCESS_TRANSFER_READ_BIT;
-    } else if (VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL == layout) {
-        flags = VK_ACCESS_SHADER_READ_BIT;
-    } else if (VK_IMAGE_LAYOUT_PRESENT_SRC_KHR == layout) {
+    } else if (VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL == layout ||
+               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL == layout ||
+               VK_IMAGE_LAYOUT_PRESENT_SRC_KHR == layout) {
+        // There are no writes that need to be made available
         flags = 0;
     }
     return flags;
@@ -80,7 +78,6 @@ VkImageAspectFlags vk_format_to_aspect_flags(VkFormat format) {
         case VK_FORMAT_D32_SFLOAT_S8_UINT:
             return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
         default:
-            SkASSERT(GrVkFormatIsSupported(format));
             return VK_IMAGE_ASPECT_COLOR_BIT;
     }
 }
@@ -89,6 +86,7 @@ void GrVkImage::setImageLayout(const GrVkGpu* gpu, VkImageLayout newLayout,
                                VkAccessFlags dstAccessMask,
                                VkPipelineStageFlags dstStageMask,
                                bool byRegion, bool releaseFamilyQueue) {
+    SkASSERT(!gpu->isDeviceLost());
     SkASSERT(VK_IMAGE_LAYOUT_UNDEFINED != newLayout &&
              VK_IMAGE_LAYOUT_PREINITIALIZED != newLayout);
     VkImageLayout currentLayout = this->currentLayout();
@@ -100,9 +98,10 @@ void GrVkImage::setImageLayout(const GrVkGpu* gpu, VkImageLayout newLayout,
     }
 
     // If the old and new layout are the same and the layout is a read only layout, there is no need
-    // to put in a barrier.
-    if (newLayout == currentLayout &&
-        !releaseFamilyQueue &&
+    // to put in a barrier unless we also need to switch queues.
+    if (newLayout == currentLayout && !releaseFamilyQueue &&
+        (fInfo.fCurrentQueueFamily == VK_QUEUE_FAMILY_IGNORED ||
+         fInfo.fCurrentQueueFamily == gpu->queueIndex()) &&
         (VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL == currentLayout ||
          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL == currentLayout ||
          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL == currentLayout)) {
@@ -129,7 +128,6 @@ void GrVkImage::setImageLayout(const GrVkGpu* gpu, VkImageLayout newLayout,
     } else if (releaseFamilyQueue) {
         // We are releasing the image so we must transfer the image back to its original queue
         // family.
-        SkASSERT(fInfo.fCurrentQueueFamily == gpu->queueIndex());
         srcQueueFamilyIndex = fInfo.fCurrentQueueFamily;
         dstQueueFamilyIndex = fInitialQueueFamily;
         fInfo.fCurrentQueueFamily = fInitialQueueFamily;
@@ -138,8 +136,8 @@ void GrVkImage::setImageLayout(const GrVkGpu* gpu, VkImageLayout newLayout,
     VkImageMemoryBarrier imageMemoryBarrier = {
         VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,          // sType
         nullptr,                                         // pNext
-        srcAccessMask,                                   // outputMask
-        dstAccessMask,                                   // inputMask
+        srcAccessMask,                                   // srcAccessMask
+        dstAccessMask,                                   // dstAccessMask
         currentLayout,                                   // oldLayout
         newLayout,                                       // newLayout
         srcQueueFamilyIndex,                             // srcQueueFamilyIndex
@@ -154,11 +152,14 @@ void GrVkImage::setImageLayout(const GrVkGpu* gpu, VkImageLayout newLayout,
     this->updateImageLayout(newLayout);
 }
 
-bool GrVkImage::InitImageInfo(const GrVkGpu* gpu, const ImageDesc& imageDesc, GrVkImageInfo* info) {
+bool GrVkImage::InitImageInfo(GrVkGpu* gpu, const ImageDesc& imageDesc, GrVkImageInfo* info) {
     if (0 == imageDesc.fWidth || 0 == imageDesc.fHeight) {
         return false;
     }
-    VkImage image = 0;
+    if ((imageDesc.fIsProtected == GrProtected::kYes) && !gpu->vkCaps().supportsProtectedMemory()) {
+        return false;
+    }
+    VkImage image = VK_NULL_HANDLE;
     GrVkAlloc alloc;
 
     bool isLinear = VK_IMAGE_TILING_LINEAR == imageDesc.fImageTiling;
@@ -174,10 +175,14 @@ bool GrVkImage::InitImageInfo(const GrVkGpu* gpu, const ImageDesc& imageDesc, Gr
     SkASSERT(VK_IMAGE_TILING_OPTIMAL == imageDesc.fImageTiling ||
              VK_SAMPLE_COUNT_1_BIT == vkSamples);
 
+    VkImageCreateFlags createflags = 0;
+    if (imageDesc.fIsProtected == GrProtected::kYes || gpu->protectedContext()) {
+        createflags |= VK_IMAGE_CREATE_PROTECTED_BIT;
+    }
     const VkImageCreateInfo imageCreateInfo = {
         VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,         // sType
         nullptr,                                     // pNext
-        0,                                           // VkImageCreateFlags
+        createflags,                                 // VkImageCreateFlags
         imageDesc.fImageType,                        // VkImageType
         imageDesc.fFormat,                           // VkFormat
         { imageDesc.fWidth, imageDesc.fHeight, 1 },  // VkExtent3D
@@ -192,8 +197,11 @@ bool GrVkImage::InitImageInfo(const GrVkGpu* gpu, const ImageDesc& imageDesc, Gr
         initialLayout                                // initialLayout
     };
 
-    GR_VK_CALL_ERRCHECK(gpu->vkInterface(), CreateImage(gpu->device(), &imageCreateInfo, nullptr,
-                                                        &image));
+    VkResult result;
+    GR_VK_CALL_RESULT(gpu, result, CreateImage(gpu->device(), &imageCreateInfo, nullptr, &image));
+    if (result != VK_SUCCESS) {
+        return false;
+    }
 
     if (!GrVkMemory::AllocAndBindImageMemory(gpu, image, isLinear, &alloc)) {
         VK_CALL(gpu, DestroyImage(gpu->device(), image, nullptr));
@@ -207,6 +215,8 @@ bool GrVkImage::InitImageInfo(const GrVkGpu* gpu, const ImageDesc& imageDesc, Gr
     info->fFormat = imageDesc.fFormat;
     info->fLevelCount = imageDesc.fLevels;
     info->fCurrentQueueFamily = VK_QUEUE_FAMILY_IGNORED;
+    info->fProtected =
+            (createflags & VK_IMAGE_CREATE_PROTECTED_BIT) ? GrProtected::kYes : GrProtected::kNo;
     return true;
 }
 
@@ -217,7 +227,7 @@ void GrVkImage::DestroyImageInfo(const GrVkGpu* gpu, GrVkImageInfo* info) {
 }
 
 GrVkImage::~GrVkImage() {
-    // should have been released or abandoned first
+    // should have been released first
     SkASSERT(!fResource);
 }
 
@@ -232,8 +242,13 @@ void GrVkImage::prepareForPresent(GrVkGpu* gpu) {
     this->setImageLayout(gpu, layout, 0, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, false, true);
 }
 
+void GrVkImage::prepareForExternal(GrVkGpu* gpu) {
+    this->setImageLayout(gpu, this->currentLayout(), 0, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, false,
+                         true);
+}
+
 void GrVkImage::releaseImage(GrVkGpu* gpu) {
-    if (fInfo.fCurrentQueueFamily != fInitialQueueFamily) {
+    if (!gpu->isDeviceLost() && fInfo.fCurrentQueueFamily != fInitialQueueFamily) {
         // The Vulkan spec is vague on what to put for the dstStageMask here. The spec for image
         // memory barrier says the dstStageMask must not be zero. However, in the spec when it talks
         // about family queue transfers it says the dstStageMask is ignored and should be set to
@@ -244,15 +259,7 @@ void GrVkImage::releaseImage(GrVkGpu* gpu) {
     }
     if (fResource) {
         fResource->removeOwningTexture();
-        fResource->unref(gpu);
-        fResource = nullptr;
-    }
-}
-
-void GrVkImage::abandonImage() {
-    if (fResource) {
-        fResource->removeOwningTexture();
-        fResource->unrefAndAbandon();
+        fResource->unref();
         fResource = nullptr;
     }
 }
@@ -263,42 +270,14 @@ void GrVkImage::setResourceRelease(sk_sp<GrRefCntedCallback> releaseHelper) {
     fResource->setRelease(std::move(releaseHelper));
 }
 
-void GrVkImage::Resource::freeGPUData(GrVkGpu* gpu) const {
+void GrVkImage::Resource::freeGPUData() const {
     this->invokeReleaseProc();
-    VK_CALL(gpu, DestroyImage(gpu->device(), fImage, nullptr));
+    VK_CALL(fGpu, DestroyImage(fGpu->device(), fImage, nullptr));
     bool isLinear = (VK_IMAGE_TILING_LINEAR == fImageTiling);
-    GrVkMemory::FreeImageMemory(gpu, isLinear, fAlloc);
+    GrVkMemory::FreeImageMemory(fGpu, isLinear, fAlloc);
 }
 
-void GrVkImage::Resource::replaceIdleProc(
-        GrVkTexture* owner, sk_sp<GrRefCntedCallback> idleCallback) const {
-    fOwningTexture = owner;
-    fIdleCallback = std::move(idleCallback);
-}
-
-void GrVkImage::Resource::removeOwningTexture() const { fOwningTexture = nullptr; }
-
-void GrVkImage::Resource::notifyAddedToCommandBuffer() const { ++fNumCommandBufferOwners; }
-
-void GrVkImage::Resource::notifyRemovedFromCommandBuffer() const {
-    SkASSERT(fNumCommandBufferOwners);
-    if (--fNumCommandBufferOwners || !fIdleCallback) {
-        return;
-    }
-    if (fOwningTexture) {
-        if (fOwningTexture->resourcePriv().hasRefOrPendingIO()) {
-            return;
-        }
-        fOwningTexture->removeIdleProc();
-    }
-    fIdleCallback.reset();
-}
-
-void GrVkImage::BorrowedResource::freeGPUData(GrVkGpu* gpu) const {
-    this->invokeReleaseProc();
-}
-
-void GrVkImage::BorrowedResource::abandonGPUData() const {
+void GrVkImage::BorrowedResource::freeGPUData() const {
     this->invokeReleaseProc();
 }
 

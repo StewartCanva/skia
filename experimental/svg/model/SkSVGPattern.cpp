@@ -5,12 +5,12 @@
  * found in the LICENSE file.
  */
 
-#include "SkSVGPattern.h"
+#include "experimental/svg/model/SkSVGPattern.h"
 
-#include "SkPictureRecorder.h"
-#include "SkShader.h"
-#include "SkSVGRenderContext.h"
-#include "SkSVGValue.h"
+#include "experimental/svg/model/SkSVGRenderContext.h"
+#include "experimental/svg/model/SkSVGValue.h"
+#include "include/core/SkPictureRecorder.h"
+#include "include/core/SkShader.h"
 
 SkSVGPattern::SkSVGPattern() : INHERITED(SkSVGTag::kPattern) {}
 
@@ -76,16 +76,16 @@ void SkSVGPattern::onSetAttribute(SkSVGAttribute attr, const SkSVGValue& v) {
 }
 
 const SkSVGPattern* SkSVGPattern::hrefTarget(const SkSVGRenderContext& ctx) const {
-    if (fHref.value().isEmpty()) {
+    if (fHref.isEmpty()) {
         return nullptr;
     }
 
-    const auto* href = ctx.findNodeById(fHref);
+    const auto href = ctx.findNodeById(fHref);
     if (!href || href->tag() != SkSVGTag::kPattern) {
         return nullptr;
     }
 
-    return static_cast<const SkSVGPattern*>(href);
+    return static_cast<const SkSVGPattern*>(href.get());
 }
 
 template <typename T>
@@ -98,7 +98,7 @@ bool inherit_if_needed(const SkTLazy<T>& src, SkTLazy<T>& dst) {
     return false;
 }
 
-/* https://www.w3.org/TR/SVG/pservers.html#PatternElementHrefAttribute
+/* https://www.w3.org/TR/SVG11/pservers.html#PatternElementHrefAttribute
  *
  * Any attributes which are defined on the referenced element which are not defined on this element
  * are inherited by this element. If this element has no children, and the referenced element does
@@ -152,7 +152,7 @@ bool SkSVGPattern::onAsPaint(const SkSVGRenderContext& ctx, SkPaint* paint) cons
     }
 
     const SkMatrix* patternTransform = attrs.fPatternTransform.isValid()
-            ? &attrs.fPatternTransform.get()->value()
+            ? attrs.fPatternTransform.get()
             : nullptr;
 
     SkPictureRecorder recorder;
@@ -161,9 +161,9 @@ bool SkSVGPattern::onAsPaint(const SkSVGRenderContext& ctx, SkPaint* paint) cons
     // Cannot call into INHERITED:: because SkSVGHiddenContainer skips rendering.
     contentNode->SkSVGContainer::onRender(recordingContext);
 
-    paint->setShader(SkShader::MakePictureShader(recorder.finishRecordingAsPicture(),
-                                                 SkShader::kRepeat_TileMode,
-                                                 SkShader::kRepeat_TileMode,
+    paint->setShader(recorder.finishRecordingAsPicture()->makeShader(
+                                                 SkTileMode::kRepeat,
+                                                 SkTileMode::kRepeat,
                                                  patternTransform,
                                                  &tile));
     return true;

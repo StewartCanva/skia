@@ -8,10 +8,11 @@
 #ifndef SKSL_PREFIXEXPRESSION
 #define SKSL_PREFIXEXPRESSION
 
-#include "SkSLExpression.h"
-#include "SkSLFloatLiteral.h"
-#include "SkSLIRGenerator.h"
-#include "SkSLLexer.h"
+#include "src/sksl/SkSLCompiler.h"
+#include "src/sksl/SkSLIRGenerator.h"
+#include "src/sksl/SkSLLexer.h"
+#include "src/sksl/ir/SkSLExpression.h"
+#include "src/sksl/ir/SkSLFloatLiteral.h"
 
 namespace SkSL {
 
@@ -25,12 +26,15 @@ struct PrefixExpression : public Expression {
     , fOperator(op) {}
 
     bool isConstant() const override {
-        return fOperator == Token::MINUS && fOperand->isConstant();
+        return fOperator == Token::Kind::TK_MINUS && fOperand->isConstant();
     }
 
-    bool hasSideEffects() const override {
-        return fOperator == Token::PLUSPLUS || fOperator == Token::MINUSMINUS ||
-               fOperand->hasSideEffects();
+    bool hasProperty(Property property) const override {
+        if (property == Property::kSideEffects && (fOperator == Token::Kind::TK_PLUSPLUS ||
+                                                   fOperator == Token::Kind::TK_MINUSMINUS)) {
+            return true;
+        }
+        return fOperand->hasProperty(property);
     }
 
     std::unique_ptr<Expression> constantPropagate(const IRGenerator& irGenerator,
@@ -43,6 +47,21 @@ struct PrefixExpression : public Expression {
 
         }
         return nullptr;
+    }
+
+    SKSL_FLOAT getFVecComponent(int index) const override {
+        SkASSERT(fOperator == Token::Kind::TK_MINUS);
+        return -fOperand->getFVecComponent(index);
+    }
+
+    SKSL_INT getIVecComponent(int index) const override {
+        SkASSERT(fOperator == Token::Kind::TK_MINUS);
+        return -fOperand->getIVecComponent(index);
+    }
+
+    SKSL_FLOAT getMatComponent(int col, int row) const override {
+        SkASSERT(fOperator == Token::Kind::TK_MINUS);
+        return -fOperand->getMatComponent(col, row);
     }
 
     std::unique_ptr<Expression> clone() const override {

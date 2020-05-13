@@ -8,10 +8,10 @@
 #ifndef SkSVGDOM_DEFINED
 #define SkSVGDOM_DEFINED
 
-#include "SkRefCnt.h"
-#include "SkSize.h"
-#include "SkSVGIDMapper.h"
-#include "SkTemplates.h"
+#include "experimental/svg/model/SkSVGIDMapper.h"
+#include "include/core/SkRefCnt.h"
+#include "include/core/SkSize.h"
+#include "include/private/SkTemplates.h"
 
 class SkCanvas;
 class SkDOM;
@@ -30,6 +30,9 @@ public:
     void setContainerSize(const SkSize&);
 
     void setRoot(sk_sp<SkSVGNode>);
+
+    // Returns the node with the given id, or nullptr if not found.
+    sk_sp<SkSVGNode>* findNodeById(const char* id);
 
     void render(SkCanvas*) const;
 

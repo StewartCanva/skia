@@ -7,6 +7,8 @@
 
 # Generate Android.bp for Skia from GN configuration.
 
+from __future__ import print_function
+
 import os
 import pprint
 import string
@@ -61,18 +63,6 @@ cc_library_static {
             ],
         },
 
-        mips: {
-            srcs: [
-                $none_srcs
-            ],
-        },
-
-        mips64: {
-            srcs: [
-                $none_srcs
-            ],
-        },
-
         x86: {
             srcs: [
                 $x86_srcs
@@ -93,11 +83,11 @@ cc_library_static {
           "third_party/vulkanmemoryallocator/GrVulkanMemoryAllocator.cpp",
         ],
         local_include_dirs: [
-          "include/config/android",
+          "android",
           "third_party/vulkanmemoryallocator/",
         ],
         export_include_dirs: [
-          "include/config/android",
+          "android",
         ],
       },
       linux_glibc: {
@@ -108,10 +98,10 @@ cc_library_static {
           $linux_srcs
         ],
         local_include_dirs: [
-          "include/config/linux",
+          "linux",
         ],
         export_include_dirs: [
-          "include/config/linux",
+          "linux",
         ],
       },
       darwin: {
@@ -122,10 +112,10 @@ cc_library_static {
           $mac_srcs
         ],
         local_include_dirs: [
-          "include/config/mac",
+          "mac",
         ],
         export_include_dirs: [
-          "include/config/mac",
+          "mac",
         ],
       },
       windows: {
@@ -137,10 +127,10 @@ cc_library_static {
           $win_srcs
         ],
         local_include_dirs: [
-          "include/config/win",
+          "win",
         ],
         export_include_dirs: [
-          "include/config/win",
+          "win",
         ],
       },
     },
@@ -287,7 +277,7 @@ cc_test {
     ],
 
     data: [
-        "resources/*",
+        "resources/**/*",
     ],
 }''')
 
@@ -300,6 +290,7 @@ def generate_args(target_os, enable_gpu):
     # files.
     'target_cpu':                         '"none"',
 
+    'skia_enable_android_utils':          'true',
     # Use the custom FontMgr, as the framework will handle fonts.
     'skia_enable_fontmgr_custom':         'false',
     'skia_enable_fontmgr_custom_empty':   'true',
@@ -308,14 +299,21 @@ def generate_args(target_os, enable_gpu):
     'skia_enable_fontmgr_win_gdi':        'false',
     'skia_use_fonthost_mac':              'false',
 
+    # enable features used in skia_nanobench
+    'skia_enable_sksl_interpreter':       'true',
+    'skia_tools_require_resources':       'true',
+
     'skia_use_freetype':                  'true',
     'skia_use_fontconfig':                'false',
     'skia_use_fixed_gamma_text':          'true',
+    'skia_include_multiframe_procs':      'false',
+    'skia_libgifcodec_path':              '"third_party/libgifcodec"',
   }
   d['target_os'] = target_os
   if target_os == '"android"':
     d['skia_enable_tools'] = 'true'
     d['skia_use_libheif']  = 'true'
+    d['skia_include_multiframe_procs'] = 'true'
   else:
     d['skia_use_libheif']  = 'false'
 
@@ -334,6 +332,7 @@ def generate_args(target_os, enable_gpu):
     # some dummy values.
     d['win_vc'] = '"dummy_version"'
     d['win_sdk_version'] = '"dummy_version"'
+    d['win_toolchain_version'] = '"dummy_version"'
   return d
 
 gn_args       = generate_args('"android"', True)
@@ -364,8 +363,8 @@ gn_to_bp_utils.GrabDependentValues(js, '//:nanobench', 'sources',
                                    nanobench_srcs, 'skia')
 
 # skcms is a little special, kind of a second-party library.
-local_includes.add("third_party/skcms")
-dm_includes   .add("third_party/skcms")
+local_includes.add("include/third_party/skcms")
+dm_includes   .add("include/third_party/skcms")
 
 # Android's build will choke if we list headers.
 def strip_headers(sources):
@@ -416,11 +415,11 @@ win_defines     = get_defines(js_win)
 
 def mkdir_if_not_exists(path):
   if not os.path.exists(path):
-    os.mkdir(path)
-mkdir_if_not_exists('include/config/android/')
-mkdir_if_not_exists('include/config/linux/')
-mkdir_if_not_exists('include/config/mac/')
-mkdir_if_not_exists('include/config/win/')
+    os.makedirs(path)
+mkdir_if_not_exists('android/include/config/')
+mkdir_if_not_exists('linux/include/config/')
+mkdir_if_not_exists('mac/include/config/')
+mkdir_if_not_exists('win/include/config/')
 
 platforms = { 'IOS', 'MAC', 'WIN', 'ANDROID', 'UNIX' }
 
@@ -434,15 +433,15 @@ def disallow_platforms(config, desired):
         s += ' || '
         if i % 2 == 1:
           s += '\\\n    '
-    print >>f, s
-    print >>f, '    #error "Only SK_BUILD_FOR_%s should be defined!"' % desired
-    print >>f, '#endif'
+    print(s, file=f)
+    print('    #error "Only SK_BUILD_FOR_%s should be defined!"' % desired, file=f)
+    print('#endif', file=f)
 
 def append_to_file(config, s):
   with open(config, 'a') as f:
-    print >>f, s
+    print(s, file=f)
 
-android_config = 'include/config/android/SkUserConfig.h'
+android_config = 'android/include/config/SkUserConfig.h'
 gn_to_bp_utils.WriteUserConfig(android_config, android_defines)
 append_to_file(android_config, '''
 #ifndef SK_BUILD_FOR_ANDROID
@@ -454,7 +453,7 @@ def write_config(config_path, defines, platform):
   gn_to_bp_utils.WriteUserConfig(config_path, defines)
   append_to_file(config_path, '''
 // Correct SK_BUILD_FOR flags that may have been set by
-// SkPreConfig.h/Android.bp
+// SkTypes.h/Android.bp
 #ifndef SK_BUILD_FOR_%s
     #define SK_BUILD_FOR_%s
 #endif
@@ -463,9 +462,9 @@ def write_config(config_path, defines, platform):
 #endif''' % (platform, platform))
   disallow_platforms(config_path, platform)
 
-write_config('include/config/linux/SkUserConfig.h', linux_defines, 'UNIX')
-write_config('include/config/mac/SkUserConfig.h',   mac_defines, 'MAC')
-write_config('include/config/win/SkUserConfig.h',   win_defines, 'WIN')
+write_config('linux/include/config/SkUserConfig.h', linux_defines, 'UNIX')
+write_config('mac/include/config/SkUserConfig.h',   mac_defines, 'MAC')
+write_config('win/include/config/SkUserConfig.h',   win_defines, 'WIN')
 
 # Turn a list of strings into the style bpfmt outputs.
 def bpfmt(indent, lst, sort=True):
@@ -475,7 +474,7 @@ def bpfmt(indent, lst, sort=True):
 
 # OK!  We have everything to fill in Android.bp...
 with open('Android.bp', 'w') as Android_bp:
-  print >>Android_bp, bp.substitute({
+  print(bp.substitute({
     'export_includes': bpfmt(8, export_includes),
     'local_includes':  bpfmt(8, local_includes),
     'srcs':            bpfmt(8, srcs),
@@ -486,7 +485,6 @@ with open('Android.bp', 'w') as Android_bp:
     'arm_neon_srcs': bpfmt(20, strip_headers(defs['neon'])),
     'arm64_srcs':    bpfmt(16, strip_headers(defs['arm64'] +
                                              defs['crc32'])),
-    'none_srcs':     bpfmt(16, strip_headers(defs['none'])),
     'x86_srcs':      bpfmt(16, strip_headers(defs['sse2'] +
                                              defs['ssse3'] +
                                              defs['sse41'] +
@@ -504,4 +502,4 @@ with open('Android.bp', 'w') as Android_bp:
     'linux_srcs':    bpfmt(10, linux_srcs),
     'mac_srcs':      bpfmt(10, mac_srcs),
     'win_srcs':      bpfmt(10, win_srcs),
-  })
+  }), file=Android_bp)

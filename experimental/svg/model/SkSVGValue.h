@@ -8,12 +8,12 @@
 #ifndef SkSVGValue_DEFINED
 #define SkSVGValue_DEFINED
 
-#include "SkColor.h"
-#include "SkMatrix.h"
-#include "SkNoncopyable.h"
-#include "SkPath.h"
-#include "SkSVGTypes.h"
-#include "SkTypes.h"
+#include "experimental/svg/model/SkSVGTypes.h"
+#include "include/core/SkColor.h"
+#include "include/core/SkMatrix.h"
+#include "include/core/SkPath.h"
+#include "include/core/SkTypes.h"
+#include "include/private/SkNoncopyable.h"
 
 class SkSVGValue : public SkNoncopyable {
 public:
@@ -30,6 +30,7 @@ public:
         kPath,
         kPoints,
         kSpreadMethod,
+        kStopColor,
         kString,
         kTransform,
         kViewBox,
@@ -89,6 +90,7 @@ using SkSVGPointsValue       = SkSVGWrapperValue<SkSVGPointsType   , SkSVGValue:
 using SkSVGStringValue       = SkSVGWrapperValue<SkSVGStringType   , SkSVGValue::Type::kString    >;
 using SkSVGSpreadMethodValue = SkSVGWrapperValue<SkSVGSpreadMethod ,
                                                  SkSVGValue::Type::kSpreadMethod>;
+using SkSVGStopColorValue    = SkSVGWrapperValue<SkSVGStopColor    , SkSVGValue::Type::kStopColor >;
 using SkSVGVisibilityValue   = SkSVGWrapperValue<SkSVGVisibility   , SkSVGValue::Type::kVisibility>;
 using SkSVGDashArrayValue    = SkSVGWrapperValue<SkSVGDashArray    , SkSVGValue::Type::kDashArray >;
 

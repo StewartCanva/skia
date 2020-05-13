@@ -5,14 +5,14 @@
  * found in the LICENSE file.
  */
 
-#include "Benchmark.h"
-#include "SkColorData.h"
-#include "SkFixed.h"
-#include "SkMathPriv.h"
-#include "SkMatrix.h"
-#include "SkPaint.h"
-#include "SkRandom.h"
-#include "SkString.h"
+#include "bench/Benchmark.h"
+#include "include/core/SkMatrix.h"
+#include "include/core/SkPaint.h"
+#include "include/core/SkString.h"
+#include "include/private/SkColorData.h"
+#include "include/private/SkFixed.h"
+#include "include/utils/SkRandom.h"
+#include "src/core/SkMathPriv.h"
 
 static float sk_fsel(float pred, float result_ge, float result_lt) {
     return pred >= 0 ? result_ge : result_lt;
@@ -441,6 +441,66 @@ private:
     typedef Benchmark INHERITED;
 };
 
+class CTZBench : public Benchmark {
+    enum {
+        ARRAY = 1000,
+    };
+    uint32_t fData[ARRAY];
+    bool fUsePortable;
+
+public:
+    CTZBench(bool usePortable) : fUsePortable(usePortable) {
+
+        SkRandom rand;
+        for (int i = 0; i < ARRAY; ++i) {
+            fData[i] = rand.nextU();
+        }
+
+        if (fUsePortable) {
+            fName = "ctz_portable";
+        } else {
+            fName = "ctz_intrinsic";
+        }
+    }
+
+    bool isSuitableFor(Backend backend) override {
+        return backend == kNonRendering_Backend;
+    }
+
+    // just so the compiler doesn't remove our loops
+    virtual void process(int) {}
+
+protected:
+    void onDraw(int loops, SkCanvas*) override {
+        int accum = 0;
+
+        if (fUsePortable) {
+            for (int j = 0; j < loops; ++j) {
+                for (int i = 0; i < ARRAY; ++i) {
+                    accum += SkCTZ_portable(fData[i]);
+                }
+                this->process(accum);
+            }
+        } else {
+            for (int j = 0; j < loops; ++j) {
+                for (int i = 0; i < ARRAY; ++i) {
+                    accum += SkCTZ(fData[i]);
+                }
+                this->process(accum);
+            }
+        }
+    }
+
+    const char* onGetName() override {
+        return fName;
+    }
+
+private:
+    const char* fName;
+
+    typedef Benchmark INHERITED;
+};
+
 ///////////////////////////////////////////////////////////////////////////////
 
 class NormalizeBench : public Benchmark {
@@ -594,6 +654,8 @@ DEF_BENCH( return new FloorBench(true); )
 
 DEF_BENCH( return new CLZBench(false); )
 DEF_BENCH( return new CLZBench(true); )
+DEF_BENCH( return new CTZBench(false); )
+DEF_BENCH( return new CTZBench(true); )
 
 DEF_BENCH( return new NormalizeBench(); )
 
@@ -601,7 +663,7 @@ DEF_BENCH( return new FixedMathBench(); )
 
 //////////////////////////////////////////////////////////////
 
-#include "../private/SkFloatBits.h"
+#include "include/private/SkFloatBits.h"
 class Floor2IntBench : public Benchmark {
     enum {
         ARRAY = 1000,

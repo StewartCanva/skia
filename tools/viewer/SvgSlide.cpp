@@ -5,13 +5,13 @@
  * found in the LICENSE file.
  */
 
-#include "SvgSlide.h"
+#include "tools/viewer/SvgSlide.h"
 
 #if defined(SK_XML)
 
-#include "SkCanvas.h"
-#include "SkStream.h"
-#include "SkSVGDOM.h"
+#include "experimental/svg/model/SkSVGDOM.h"
+#include "include/core/SkCanvas.h"
+#include "include/core/SkStream.h"
 
 SvgSlide::SvgSlide(const SkString& name, const SkString& path)
     : fPath(path) {
@@ -31,6 +31,13 @@ void SvgSlide::load(SkScalar w, SkScalar h) {
 
 void SvgSlide::unload() {
     fDom.reset();
+}
+
+void SvgSlide::resize(SkScalar w, SkScalar h) {
+    fWinSize = { w, h };
+    if (fDom) {
+        fDom->setContainerSize(fWinSize);
+    }
 }
 
 SkISize SvgSlide::getDimensions() const {

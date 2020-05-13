@@ -8,46 +8,22 @@
 #ifndef SkSVGTypes_DEFINED
 #define SkSVGTypes_DEFINED
 
-#include "SkColor.h"
-#include "SkMatrix.h"
-#include "SkPath.h"
-#include "SkPoint.h"
-#include "SkRect.h"
-#include "SkScalar.h"
-#include "SkString.h"
-#include "SkTDArray.h"
-#include "SkTypes.h"
+#include "include/core/SkColor.h"
+#include "include/core/SkMatrix.h"
+#include "include/core/SkPath.h"
+#include "include/core/SkPoint.h"
+#include "include/core/SkRect.h"
+#include "include/core/SkScalar.h"
+#include "include/core/SkString.h"
+#include "include/core/SkTypes.h"
+#include "include/private/SkTDArray.h"
 
-template <typename T>
-class SkSVGPrimitiveTypeWrapper {
-public:
-    SkSVGPrimitiveTypeWrapper() = default;
-    explicit constexpr SkSVGPrimitiveTypeWrapper(T v) : fValue(v) {}
-
-    SkSVGPrimitiveTypeWrapper(const SkSVGPrimitiveTypeWrapper&)            = default;
-    SkSVGPrimitiveTypeWrapper& operator=(const SkSVGPrimitiveTypeWrapper&) = default;
-    SkSVGPrimitiveTypeWrapper& operator=(const T& v) { fValue = v; return *this; }
-
-    bool operator==(const SkSVGPrimitiveTypeWrapper<T>& other) const {
-        return fValue == other.fValue;
-    }
-    bool operator!=(const SkSVGPrimitiveTypeWrapper<T>& other) const {
-        return !(*this == other);
-    }
-
-    const T& value() const { return fValue; }
-    operator const T&() const { return fValue; }
-
-private:
-    T fValue;
-};
-
-using SkSVGColorType      = SkSVGPrimitiveTypeWrapper<SkColor >;
-using SkSVGNumberType     = SkSVGPrimitiveTypeWrapper<SkScalar>;
-using SkSVGStringType     = SkSVGPrimitiveTypeWrapper<SkString>;
-using SkSVGViewBoxType    = SkSVGPrimitiveTypeWrapper<SkRect  >;
-using SkSVGTransformType  = SkSVGPrimitiveTypeWrapper<SkMatrix>;
-using SkSVGPointsType     = SkSVGPrimitiveTypeWrapper<SkTDArray<SkPoint>>;
+using SkSVGColorType     = SkColor;
+using SkSVGNumberType    = SkScalar;
+using SkSVGStringType    = SkString;
+using SkSVGViewBoxType   = SkRect;
+using SkSVGTransformType = SkMatrix;
+using SkSVGPointsType    = SkTDArray<SkPoint>;
 
 class SkSVGLength {
 public:
@@ -239,9 +215,9 @@ public:
 
     Type type() const { return fType; }
 
-    SkPath::FillType asFillType() const {
+    SkPathFillType asFillType() const {
         SkASSERT(fType != Type::kInherit); // should never be called for unresolved values.
-        return fType == Type::kEvenOdd ? SkPath::kEvenOdd_FillType : SkPath::kWinding_FillType;
+        return fType == Type::kEvenOdd ? SkPathFillType::kEvenOdd : SkPathFillType::kWinding;
     }
 
 private:
@@ -301,6 +277,35 @@ public:
 private:
     Type fType;
     SkTDArray<SkSVGLength> fDashArray;
+};
+
+class SkSVGStopColor {
+public:
+    enum class Type {
+        kColor,
+        kCurrentColor,
+        kICCColor,
+        kInherit,
+    };
+
+    SkSVGStopColor() : fType(Type::kColor), fColor(SK_ColorBLACK) {}
+    explicit SkSVGStopColor(Type t) : fType(t), fColor(SK_ColorBLACK) {}
+    explicit SkSVGStopColor(const SkSVGColorType& c) : fType(Type::kColor), fColor(c) {}
+
+    SkSVGStopColor(const SkSVGStopColor&)            = default;
+    SkSVGStopColor& operator=(const SkSVGStopColor&) = default;
+
+    bool operator==(const SkSVGStopColor& other) const {
+        return fType == other.fType && fColor == other.fColor;
+    }
+    bool operator!=(const SkSVGStopColor& other) const { return !(*this == other); }
+
+    Type type() const { return fType; }
+    const SkSVGColorType& color() const { SkASSERT(fType == Type::kColor); return fColor; }
+
+private:
+    Type fType;
+    SkSVGColorType fColor;
 };
 
 #endif // SkSVGTypes_DEFINED

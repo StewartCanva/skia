@@ -8,12 +8,13 @@
 #ifndef SkSVGGradient_DEFINED
 #define SkSVGGradient_DEFINED
 
-#include "SkShader.h"
-#include "SkSVGHiddenContainer.h"
-#include "SkSVGTypes.h"
+#include "experimental/svg/model/SkSVGHiddenContainer.h"
+#include "experimental/svg/model/SkSVGTypes.h"
+#include "include/core/SkShader.h"
 
 class SkMatrix;
 class SkSVGRenderContext;
+class SkSVGStop;
 
 class SkSVGGradient : public SkSVGHiddenContainer {
 public:
@@ -32,12 +33,13 @@ protected:
 
     virtual sk_sp<SkShader> onMakeShader(const SkSVGRenderContext&,
                                          const SkColor*, const SkScalar*, int count,
-                                         SkShader::TileMode, const SkMatrix& localMatrix) const = 0;
+                                         SkTileMode, const SkMatrix& localMatrix) const = 0;
 
 private:
     using StopPositionArray = SkSTArray<2, SkScalar, true>;
     using    StopColorArray = SkSTArray<2,  SkColor, true>;
     void collectColorStops(const SkSVGRenderContext&, StopPositionArray*, StopColorArray*) const;
+    SkColor resolveStopColor(const SkSVGRenderContext&, const SkSVGStop&) const;
 
     SkSVGStringType    fHref;
     SkSVGTransformType fGradientTransform = SkSVGTransformType(SkMatrix::I());
